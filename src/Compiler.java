@@ -61,11 +61,6 @@ public class Compiler {
                 }
                 continue;
             } else if (flag == 8) {
-                /*
-                if (ch == '\n' || ch == '\r')
-                    line ++;
-
-                 */
                 if (ch == '\n')
                     line ++;
                 if (ch == '*') {
@@ -90,8 +85,6 @@ public class Compiler {
             if (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r') {
                 add_new_word(tempWord.toString(), type_map.get(flag), line);
                 flag = 0;
-                //if (ch == '\n' || ch == '\r')
-                  //  line++;
                 if (ch == '\n')
                     line ++;
             } else if (Lexical.isComment(ch)) {
@@ -140,15 +133,6 @@ public class Compiler {
                 }
             }
         }
-        /*
-
-        for (Lexical i : inputFile) {
-            writer.append(i.lexical_type).append(" ").append(i.lexical_content).append("\n");
-        }
-        writer.close();
-        output.close();
-
-         */
     }
 
     public static void syntactic_analysis() throws IOException {
@@ -183,10 +167,6 @@ public class Compiler {
 
     public static void add_word_to_symbol_table(Lexical word, String type, String var_type) {
         currentSymbolTable.map.put(word.lexical_content, new Symbol(word, type, var_type));
-    }
-
-    public static void print_symbol(Lexical word) throws IOException {
-        //writer.append(word.lexical_content).append("\n");
     }
 
     public static void new_symbol_table() throws IOException {
