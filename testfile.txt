@@ -1,0 +1,6 @@
+int m = 1, c = 2;
+const int d[2][2] = {{}, {}};
+
+int main () {
+    return 1;
+}
