@@ -136,7 +136,7 @@ public class Compiler {
     }
 
     public static void syntactic_analysis() throws IOException {
-        output = Files.newOutputStream(Paths.get("error.txt"));
+        output = Files.newOutputStream(Paths.get("llvm_ir.txt"));
         writer = new OutputStreamWriter(output, StandardCharsets.UTF_8);
         Syntactic.CompUnit();
         writer.close();
@@ -175,6 +175,10 @@ public class Compiler {
         currentSymbolTable = temp;
     }
 
+    public static void llvmPrint(String word) throws IOException {
+        writer.append(word);
+    }
+
     public static Symbol search_symbol_table(Lexical word) {
         SymbolTable temp = currentSymbolTable;
         while (temp != null) {
@@ -187,12 +191,11 @@ public class Compiler {
     }
 
     public static void error_analysis(char error_code, int error_line) throws IOException {
-        writer.append(String.valueOf(error_line)).append(" ").append(String.valueOf(error_code)).append("\n");
+        //writer.append(String.valueOf(error_line)).append(" ").append(String.valueOf(error_code)).append("\n");
     }
 
     public static void main(String[] args) throws IOException {
         Compiler.lexical_analysis();
         Compiler.syntactic_analysis();
     }
-
 }

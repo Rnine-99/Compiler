@@ -54,19 +54,42 @@ public class Syntactic {
             Compiler.add_word_to_symbol_table(current_word, "func", fun_type);
         }
         current_func = Compiler.search_symbol_table(current_word);
+        Compiler.llvmPrint(" @"+current_word.lexical_content);
         Ident();
         Compiler.new_symbol_table();
         if (!current_word.lexical_content.equals("(")) {
             ERROR();
         } else {
+            Compiler.llvmPrint(current_word.lexical_content);
             Compiler.print_word(current_word);
         }
         if (!current_word.lexical_content.equals(")"))
             FuncFParams();
+        for (Symbol i : current_func.fun_param) {
+            switch (i.dimension) {
+                case 1:
+                    Compiler.llvmPrint("i32 ");
+                    break;
+                case 2:
+                    Compiler.llvmPrint("i32* ");
+                    break;
+                default:
+                    for (int k = i.dimension - 3;k >= 0;k --) {
+                        Compiler.llvmPrint("["+current_func.fun_dimension.get(k)+"x");
+                    }
+                    Compiler.llvmPrint("i32");
+                    for (int k = i.dimension - 3;k >= 0;k --) {
+                        Compiler.llvmPrint("]");
+                    }
+                    Compiler.llvmPrint("* ");
+                    break;
+            }
+        }
         if (!current_word.lexical_content.equals(")")) {
             int temp_line = get_previous_line();
             Compiler.error_analysis('j', temp_line);
         } else {
+            Compiler.llvmPrint(current_word.lexical_content);
             Compiler.print_word(current_word);
         }
         if (fun_type.equals("int")) {
@@ -174,8 +197,13 @@ public class Syntactic {
         String temp = current_word.lexical_content;
         if (!(current_word.lexical_content.equals("void") || current_word.lexical_content.equals("int")))
             ERROR();
-        else
+        else {
+            if (current_word.lexical_content.equals("void"))
+                Compiler.llvmPrint("define "+temp);
+            else
+                Compiler.llvmPrint("define "+"i32");
             Compiler.print_word(current_word);
+        }
         Compiler.print_syntactic("<FuncType>");
         return temp;
     }
@@ -309,6 +337,8 @@ public class Syntactic {
             while (current_word.lexical_content.equals("[")) {
                 temp_dimension ++;
                 Compiler.print_word(current_word);
+                if (current_word.lexical_type.equals("INTCON") && param != null)
+                    param.fun_dimension.add(Integer.valueOf(current_word.lexical_content));
                 ConstExp();
                 if (!current_word.lexical_content.equals("]")) {
                     temp_line = get_previous_line();
