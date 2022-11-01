@@ -1,1 +1,1 @@
-define i32 @sum(i32 i32* )
+define dso_local i32 @sum(i32 ,i32*)

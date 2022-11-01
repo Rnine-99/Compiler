@@ -11,6 +11,8 @@ public class Syntactic {
     public static int while_block_flag = 0;
     public static Lexical last_sentence = null;
     public static int block_layers = 0;
+    // 该变量用于监控当前阶段，即{Decl}, {FuncDef}, MainFuncDef
+    public static int stage = 1;
     public static void CompUnit() throws IOException {
         Compiler.current_word();
         while (true) {
@@ -25,6 +27,7 @@ public class Syntactic {
             Compiler.previous_word();
             Decl();
         }
+        stage ++;
         while (true) {
             Compiler.current_word();
             if (current_word.lexical_content.equals("main")) {
@@ -34,6 +37,7 @@ public class Syntactic {
             Compiler.previous_word();
             FuncDef();
         }
+        stage ++;
         MainFuncDef();
         Compiler.print_syntactic("<CompUnit>");
     }
@@ -57,6 +61,7 @@ public class Syntactic {
         Compiler.llvmPrint(" @"+current_word.lexical_content);
         Ident();
         Compiler.new_symbol_table();
+        Compiler.newRegisterTable();
         if (!current_word.lexical_content.equals("(")) {
             ERROR();
         } else {
@@ -65,13 +70,16 @@ public class Syntactic {
         }
         if (!current_word.lexical_content.equals(")"))
             FuncFParams();
-        for (Symbol i : current_func.fun_param) {
+        for (int j = 0;j < current_func.fun_param.size();j ++) {
+            Symbol i = current_func.fun_param.get(j);
+            if (j != 0)
+                Compiler.llvmPrint(" ,");
             switch (i.dimension) {
                 case 1:
-                    Compiler.llvmPrint("i32 ");
+                    Compiler.llvmPrint("i32");
                     break;
                 case 2:
-                    Compiler.llvmPrint("i32* ");
+                    Compiler.llvmPrint("i32*");
                     break;
                 default:
                     for (int k = i.dimension - 3;k >= 0;k --) {
@@ -81,7 +89,7 @@ public class Syntactic {
                     for (int k = i.dimension - 3;k >= 0;k --) {
                         Compiler.llvmPrint("]");
                     }
-                    Compiler.llvmPrint("* ");
+                    Compiler.llvmPrint("*");
                     break;
             }
         }
@@ -106,6 +114,7 @@ public class Syntactic {
         Compiler.current_word();
         Compiler.print_syntactic("<FuncDef>");
         Compiler.currentSymbolTable = Compiler.currentSymbolTable.parent;
+        Compiler.currentRegisterTable = Compiler.currentRegisterTable.parent;
     }
 
     public static void MainFuncDef() throws IOException {
@@ -136,6 +145,7 @@ public class Syntactic {
         fun_if_return = 0;
         last_sentence = null;
         Compiler.new_symbol_table();
+        Compiler.newRegisterTable();
         Block();
         Compiler.previous_word();
         Compiler.current_word();
@@ -144,6 +154,7 @@ public class Syntactic {
         Compiler.current_word();
         Compiler.print_syntactic("<MainFuncDef>");
         Compiler.currentSymbolTable = Compiler.currentSymbolTable.parent;
+        Compiler.currentRegisterTable = Compiler.currentRegisterTable.parent;
     }
 
     public static void ConstDecl() throws IOException {
@@ -199,9 +210,9 @@ public class Syntactic {
             ERROR();
         else {
             if (current_word.lexical_content.equals("void"))
-                Compiler.llvmPrint("define "+temp);
+                Compiler.llvmPrint("define dso_local "+temp);
             else
-                Compiler.llvmPrint("define "+"i32");
+                Compiler.llvmPrint("define dso_local "+"i32");
             Compiler.print_word(current_word);
         }
         Compiler.print_syntactic("<FuncType>");
@@ -276,6 +287,17 @@ public class Syntactic {
         if (const_var != null)
             const_var.dimension = temp_dimension;
         Compiler.print_word(current_word);
+        // 此处常量变量定义未考虑数组情况（懒
+        // 如果常量定义初始化是个计算式？
+        if (const_var != null) {
+            if (stage == 0)
+                Compiler.llvmPrint("@" + const_var.word.lexical_content + " = dso_local constant i32 "+current_word.lexical_content);
+            else {
+                Compiler.llvmPrint("%" + Compiler.currentRegisterTable.map.size() + " = alloca i32");
+                Compiler.llvmPrint();
+            }
+            Compiler.newRegister(const_var);
+        }
         ConstInitVal();
         Compiler.print_syntactic("<ConstDef>");
     }
@@ -348,8 +370,10 @@ public class Syntactic {
                     Compiler.print_word(current_word);
             }
         }
-        if (param != null)
+        if (param != null) {
             param.dimension = temp_dimension;
+            Compiler.newRegister(param);
+        }
         current_func.fun_param.add(param);
         Compiler.print_syntactic("<FuncFParam>");
     }

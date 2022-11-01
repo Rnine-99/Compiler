@@ -15,6 +15,7 @@ public class Compiler {
     public static StringBuilder tempWord = new StringBuilder();
     public static int current_word = 0;
     public static SymbolTable currentSymbolTable = new SymbolTable();
+    public static RegisterTable currentRegisterTable = new RegisterTable();
 
     public static void add_new_word(String word, String type, int line) {
         if (word.equals("") || word.equals("//") || word.equals("/*") || type.equals("NULL"))
@@ -192,6 +193,16 @@ public class Compiler {
 
     public static void error_analysis(char error_code, int error_line) throws IOException {
         //writer.append(String.valueOf(error_line)).append(" ").append(String.valueOf(error_code)).append("\n");
+    }
+
+    public static void newRegister(Symbol word) {
+        currentRegisterTable.map.put(word.word.lexical_content, new Register(currentRegisterTable.map.size()));
+    }
+
+    public static void newRegisterTable() {
+        RegisterTable temp = new RegisterTable();
+        temp.parent = Compiler.currentRegisterTable;
+        currentRegisterTable = temp;
     }
 
     public static void main(String[] args) throws IOException {
