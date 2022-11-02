@@ -13,6 +13,7 @@ public class Syntactic {
     public static int block_layers = 0;
     // 该变量用于监控当前阶段，即{Decl}, {FuncDef}, MainFuncDef
     public static int stage = 1;
+    public static int if_block_start = 1;
     public static void CompUnit() throws IOException {
         Compiler.current_word();
         while (true) {
@@ -107,7 +108,10 @@ public class Syntactic {
         } else
             fun_type_flag = 0;
         last_sentence = null;
+        Compiler.llvmPrint(" {\n");
+        if_block_start = 1;
         Block();
+        Compiler.llvmPrint("}\n");
         Compiler.previous_word();
         if (fun_type_flag == 1 && (last_sentence == null || !last_sentence.lexical_content.equals("return")))
             Compiler.error_analysis('g', current_word.lexical_line);
@@ -146,6 +150,7 @@ public class Syntactic {
         last_sentence = null;
         Compiler.new_symbol_table();
         Compiler.newRegisterTable();
+        if_block_start = 1;
         Block();
         Compiler.previous_word();
         Compiler.current_word();
@@ -290,11 +295,17 @@ public class Syntactic {
         // 此处常量变量定义未考虑数组情况（懒
         // 如果常量定义初始化是个计算式？
         if (const_var != null) {
-            if (stage == 0)
-                Compiler.llvmPrint("@" + const_var.word.lexical_content + " = dso_local constant i32 "+current_word.lexical_content);
-            else {
-                Compiler.llvmPrint("%" + Compiler.currentRegisterTable.map.size() + " = alloca i32");
-                Compiler.llvmPrint();
+            if (stage == 0) {
+                if (temp_dimension == 1)
+                    Compiler.llvmPrint("@" + const_var.word.lexical_content + " = dso_local constant i32 " + current_word.lexical_content);
+                else if (temp_dimension == 2)
+                    Compiler.llvmPrint("@" + const_var.word.lexical_content + " = dso_local constant i32* " + current_word.lexical_content);
+            } else {
+                if (temp_dimension == 1)
+                    Compiler.llvmPrint("%" + Compiler.currentRegisterTable.map.size() + " = alloca i32\n");
+                else if (temp_dimension == 2)
+                    Compiler.llvmPrint("%" + Compiler.currentRegisterTable.map.size() + " = alloca i32*\n");
+                //Compiler.llvmPrint();
             }
             Compiler.newRegister(const_var);
         }
@@ -323,15 +334,43 @@ public class Syntactic {
             else
                 Compiler.print_word(current_word);
         }
-        if (var != null)
+        if (var != null) {
             var.dimension = temp_dimension;
+            if (stage == 0) {
+                if (temp_dimension == 1) {
+                    Compiler.llvmPrint("@"+var.word.lexical_content+" = dso_local global i32");
+                } else if (temp_dimension == 2) {
+                    Compiler.llvmPrint("@"+var.word.lexical_content+" = dso_local global i32*");
+                }
+            } else {
+                if (temp_dimension == 1) {
+                    Compiler.llvmPrint("%"+Compiler.currentRegisterTable.map.size()+" = alloca i32\n");
+                } else if (temp_dimension == 2) {
+                    Compiler.llvmPrint("%"+Compiler.currentRegisterTable.map.size()+" = alloca i32*\n");
+                }
+            }
+            Compiler.newRegister(var);
+            var.register = Compiler.currentRegisterTable.map.get(var.word.lexical_content);
+        }
         if (!current_word.lexical_content.equals("=")) {
+            if (stage == 0) {
+                Compiler.llvmPrint(" 0\n");
+            }
             Compiler.print_syntactic("<VarDef>");
             return;
         } else {
             Compiler.print_word(current_word);
         }
-        InitVal();
+        String temp = InitVal();
+        if (stage == 0) {
+
+        } else {
+            if (temp_dimension == 1) {
+                assert var != null;
+                Compiler.llvmPrint("store i32 "+temp+", i32* %"+var.register.registerNumber+"\n");
+            }
+
+        }
         Compiler.print_syntactic("<VarDef>");
     }
 
@@ -379,6 +418,10 @@ public class Syntactic {
     }
 
     public static void BlockItem() throws IOException {
+        if (if_block_start == 1) {
+            Compiler.newLabelRegister();
+            if_block_start = 0;
+        }
         if (current_word.lexical_content.equals("const") || current_word.lexical_content.equals("int")) {
             Decl();
         } else {
@@ -598,7 +641,8 @@ public class Syntactic {
         return false;
     }
 
-    public static void InitVal() throws IOException {
+    public static String InitVal() throws IOException {
+        String returnValue = null;
         if (current_word.lexical_content.equals("{")) {
             Compiler.print_word(current_word);
             if (!current_word.lexical_content.equals("}")) {
@@ -613,9 +657,10 @@ public class Syntactic {
             } else
                 ERROR();
         } else {
-            Exp();
+            returnValue = Exp();
         }
         Compiler.print_syntactic("<InitVal>");
+        return returnValue;
     }
 
     public static int get_previous_line() {
@@ -625,14 +670,34 @@ public class Syntactic {
         return temp_line;
     }
 
-    public static void AddExp() throws IOException {
-        MulExp();
+    public static String AddExp() throws IOException {
+        String returnValue;
+        int operator = 0;
+        returnValue = MulExp();
         while (current_word.lexical_content.equals("+") || current_word.lexical_content.equals("-")) {
+            switch (current_word.lexical_content) {
+                case "+":
+                    operator = 1;
+                    break;
+                case "-":
+                    operator = 2;
+                    break;
+            }
             Compiler.print_syntactic("<AddExp>");
             Compiler.print_word(current_word);
-            MulExp();
+            String temp = MulExp();
+            switch (operator) {
+                case 1:
+                    Compiler.newTempRegister(returnValue+"+"+temp);
+                    break;
+                case 2:
+                    Compiler.newTempRegister(returnValue+"-"+temp);
+                    break;
+            }
+            returnValue = "%"+Compiler.currentRegisterTable.map.size();
         }
         Compiler.print_syntactic("<AddExp>");
+        return returnValue;
     }
 
     public static void Cond() throws IOException {
@@ -640,20 +705,46 @@ public class Syntactic {
         Compiler.print_syntactic("<Cond>");
     }
 
-    public static void Exp() throws IOException {
-        AddExp();
+    public static String Exp() throws IOException {
+        String returnValue = AddExp();
         Compiler.print_syntactic("<Exp>");
+        return returnValue;
     }
 
-    public static void MulExp() throws IOException {
-        UnaryExp();
+    public static String MulExp() throws IOException {
+        String returnValue;
+        int operator = 0;
+        returnValue = UnaryExp();
         while (current_word.lexical_content.equals("*") || current_word.lexical_content.equals("/") ||
         current_word.lexical_content.equals("%")) {
+            switch (current_word.lexical_content) {
+                case "*":
+                    operator = 1;
+                    break;
+                case "/":
+                    operator = 2;
+                    break;
+                case "%":
+                    operator = 3;
+                    break;
+            }
             Compiler.print_syntactic("<MulExp>");
             Compiler.print_word(current_word);
-            UnaryExp();
+            String temp = UnaryExp();
+            switch (operator) {
+                case 1:
+                    Compiler.newTempRegister(returnValue+"*"+temp);
+                    break;
+                case 2:
+                    Compiler.newTempRegister(returnValue+"/"+temp);
+                    break;
+                case 3:
+                    Compiler.newTempRegister(returnValue+"%"+temp);
+            }
+            returnValue = "%"+Compiler.currentRegisterTable.map.size();
         }
         Compiler.print_syntactic("<MulExp>");
+        return returnValue;
     }
 
     public static void LOrExp() throws IOException {
@@ -666,8 +757,9 @@ public class Syntactic {
         Compiler.print_syntactic("<LOrExp>");
     }
 
-    public static void UnaryExp() throws IOException {
+    public static String UnaryExp() throws IOException {
         Symbol temp_func = null;
+        String returnValue = null;
         if (current_word.lexical_content.equals("+") ||
         current_word.lexical_content.equals("-") ||
         current_word.lexical_content.equals("!")) {
@@ -720,9 +812,10 @@ public class Syntactic {
         } else if (current_word.lexical_content.equals("(")) {
             PrimaryExp();
         } else if (current_word.lexical_type.equals("INTCON")) {
-            PrimaryExp();
+            returnValue = PrimaryExp();
         }
         Compiler.print_syntactic("<UnaryExp>");
+        return returnValue;
     }
 
     public static Symbol LVal() throws IOException {
@@ -752,7 +845,8 @@ public class Syntactic {
         return temp_word;
     }
 
-    public static void PrimaryExp() throws IOException {
+    public static String PrimaryExp() throws IOException {
+        String returnValue = null;
         switch (current_word.lexical_type) {
             case "LPARENT":
                 Compiler.print_word(current_word);
@@ -769,20 +863,24 @@ public class Syntactic {
                 LVal();
                 break;
             case "INTCON":
-                Number_Int();
+                returnValue = Number_Int();
                 break;
         }
         Compiler.print_syntactic("<PrimaryExp>");
+        return returnValue;
     }
 
-    public static void Number_Int() throws IOException {
+    public static String Number_Int() throws IOException {
+        String returnValue = null;
         if (!current_word.lexical_type.equals("INTCON"))
             ERROR();
         else {
+            returnValue = current_word.lexical_content;
             Compiler.print_word(current_word);
         }
         current_param_dimension = 1;
         Compiler.print_syntactic("<Number>");
+        return returnValue;
     }
 
     public static void LAndExp() throws IOException {

@@ -1,5 +1,5 @@
 int sum(int a, int b[]) {
-    return 1;
+    int c = 1;
 }
 int main() {
     return 0;

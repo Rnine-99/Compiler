@@ -199,6 +199,14 @@ public class Compiler {
         currentRegisterTable.map.put(word.word.lexical_content, new Register(currentRegisterTable.map.size()));
     }
 
+    public static void newLabelRegister() {
+        currentRegisterTable.map.put("label"+currentRegisterTable.map.size(), new Register(currentRegisterTable.map.size()));
+    }
+
+    public static void newTempRegister(String word) {
+        currentRegisterTable.map.put(word, new Register(currentRegisterTable.map.size()));
+    }
+
     public static void newRegisterTable() {
         RegisterTable temp = new RegisterTable();
         temp.parent = Compiler.currentRegisterTable;
