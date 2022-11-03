@@ -14,6 +14,7 @@ public class Syntactic {
     // 该变量用于监控当前阶段，即{Decl}, {FuncDef}, MainFuncDef
     public static int stage = 1;
     public static int if_block_start = 1;
+    public static ArrayList<String> printf_param = new ArrayList<>();
     public static void CompUnit() throws IOException {
         Compiler.llvmPrint("declare i32 @getint()\n"+
                 "declare void @putint(i32)\n"+
@@ -555,6 +556,7 @@ public class Syntactic {
             }
         } else if (current_word.lexical_content.equals("printf")) {
             int temp_exp_num = 0, format_string_line, printf_line, format_string_num;
+            String printf_word = null;
             printf_line = current_word.lexical_line;
             Compiler.print_word(current_word);
             if (!current_word.lexical_content.equals("("))
@@ -563,12 +565,15 @@ public class Syntactic {
                 Compiler.print_word(current_word);
             format_string_num = FormatString_num();
             format_string_line = current_word.lexical_line;
+            printf_word = current_word.lexical_content;
             FormatString();
             while (current_word.lexical_content.equals(",")) {
                 temp_exp_num ++;
                 Compiler.print_word(current_word);
-                Exp();
+                returnValue = Exp();
+                printf_param.add(returnValue);
             }
+            llvmFormatString(printf_word);
             if (format_string_num == -1) {
                 Compiler.error_analysis('a', format_string_line);
             } else if (temp_exp_num != format_string_num) {
@@ -590,17 +595,6 @@ public class Syntactic {
             // 函数调用
             if (current_word.lexical_content.equals("(")) {
                 Compiler.previous_word();
-                String expValue = Exp();
-                Symbol func = Compiler.search_symbol_table(new Lexical(expValue));
-                Compiler.llvmPrint("call ", stage);
-                /*
-                assert func != null;
-                if (func.var_type.equals("void")) {
-                    Compiler.llvmPrint("void @"+expValue+"(", stage);
-                } else {
-                    Compiler.llvmPrint("i32 @"+expValue+"(", stage);
-                }
-                 */
                 Compiler.previous_word();
                 temp_line = current_word.lexical_line;
                 Compiler.current_word();
@@ -828,17 +822,29 @@ public class Syntactic {
                 // 函数调用
                 Compiler.current_word = temp - 1;
                 Compiler.current_word();
+                Register funcRegister = null;
                 // 或许应该在这里进行函数调用？
                 if ((Compiler.search_symbol_table(current_word)) == null)
                     Compiler.error_analysis('c', current_word.lexical_line);
                 else
                     temp_func = Compiler.search_symbol_table(current_word);
+                if (temp_func != null) {
+                    if (temp_func.var_type.equals("int")) {
+                        funcRegister = Compiler.newTempRegister("func"+
+                                Compiler.currentRegisterTable.map.size());
+                        Compiler.llvmPrint("%"+funcRegister.registerNumber+
+                                " = call i32 @"+temp_func.word.lexical_content+"(", stage);
+                    } else {
+                        Compiler.llvmPrint("call void @"+
+                                temp_func.word.lexical_content+"(", stage);
+                    }
+                }
                 current_statement = current_word;
                 Compiler.print_word(current_word);
                 Compiler.print_word(current_word);
                 if (!current_word.lexical_content.equals(")")) {
                     if (temp_func != null) {
-                        returnValue = temp_func.word.lexical_content;
+                        //returnValue = temp_func.word.lexical_content;
                         FuncRParams(temp_func);
                     } else {
                         while (!current_word.lexical_content.equals(")")) {
@@ -849,9 +855,12 @@ public class Syntactic {
                         int temp_line = get_previous_line();
                         Compiler.error_analysis('j', temp_line);
                     }
-                    else
+                    else {
                         Compiler.print_word(current_word);
+                        Compiler.llvmPrint(")\n", 1);
+                    }
                 } else {
+                    Compiler.llvmPrint(")\n", 1);
                     if (temp_func != null)
                         if (temp_func.fun_param.size() != 0) {
                             Compiler.error_analysis('d', Compiler.inputFile.get(temp).lexical_line);
@@ -863,6 +872,9 @@ public class Syntactic {
                         current_param_dimension = -1;
                     else
                         current_param_dimension = 1;
+                }
+                if (funcRegister != null) {
+                    returnValue = "%"+funcRegister.registerNumber;
                 }
             } else {
                 Compiler.previous_word();
@@ -978,11 +990,12 @@ public class Syntactic {
     public static void FormatString() throws IOException {
         if (!current_word.lexical_type.equals("STRCON"))
             ERROR();
-        else
+        else {
             Compiler.print_word(current_word);
+        }
     }
 
-    public static int FormatString_num() {
+    public static int FormatString_num() throws IOException {
         StringBuilder temp = new StringBuilder(current_word.lexical_content);
         int temp_num = 0;
         for (int i = 1;i < temp.length() - 1;i ++) {
@@ -1001,6 +1014,45 @@ public class Syntactic {
         return temp_num;
     }
 
+    public static int llvmFormatString(String word) throws IOException {
+        StringBuilder temp = new StringBuilder(word);
+        int temp_num = 0;
+        for (int i = 1;i < temp.length() - 1;i ++) {
+            if (temp.charAt(i) == '%') {
+                if (temp.charAt(i + 1) == 'd') {
+                    callPutChar(printf_param.get(temp_num));
+                    i ++;
+                    continue;
+                }
+                else
+                    return -1;
+            } else if (temp.charAt(i) == 92 && temp.charAt(i + 1) != 'n')
+                return -1;
+            else if (temp.charAt(i) != 32 &&
+                    temp.charAt(i) != 33 &&
+                    !(temp.charAt(i) >= 40 && temp.charAt(i) <= 126))
+                return -1;
+            else if (temp.charAt(i) == 92 && temp.charAt(i + 1) == 'n') {
+                callPutChar(String.valueOf(10));
+                i ++;
+                continue;
+            }
+            callPutChar(String.valueOf((int)temp.charAt(i)));
+        }
+        return temp_num;
+    }
+
+    public static void callPutChar(String word) throws IOException {
+        int temp = 0;
+        if (!word.contains("%")) {
+            temp = Integer.parseInt(word);
+        }
+        if (!word.contains("%"))
+            Compiler.llvmPrint("call void @putch i32 "+temp+"\n", stage);
+        else
+            Compiler.llvmPrint("call void @putint i32 "+word+"\n", stage);
+    }
+
     public static void UnaryOp() throws IOException {
         if (!(current_word.lexical_content.equals("+") ||
                 current_word.lexical_content.equals("-") ||
@@ -1013,18 +1065,23 @@ public class Syntactic {
 
     public static void FuncRParams(Symbol temp_func) throws IOException {
         ArrayList<Integer> func_param = new ArrayList<>();
+        ArrayList<String> func_register = new ArrayList<>();
+        String returnValue = null;
         int params_num = 0;
-        Exp();
+        returnValue = Exp();
         if (current_param_dimension != 0) {
             func_param.add(current_param_dimension);
+            func_register.add(returnValue);
             params_num ++;
         }
         while (current_word.lexical_content.equals(",")) {
             Compiler.print_word(current_word);
-            Exp();
+            returnValue = Exp();
             params_num ++;
-            if (current_param_dimension != 0)
+            if (current_param_dimension != 0) {
                 func_param.add(current_param_dimension);
+                func_register.add(returnValue);
+            }
         }
         if (params_num != temp_func.fun_param.size())
             Compiler.error_analysis('d', current_statement.lexical_line);
@@ -1032,6 +1089,19 @@ public class Syntactic {
             for (int i = 0;i < params_num;i ++) {
                 if (func_param.get(i) != -2 && temp_func.fun_param.get(i).dimension != func_param.get(i))
                     Compiler.error_analysis('e', current_word.lexical_line);
+                else {
+                    if (i != 0) {
+                        Compiler.llvmPrint(", ", 1);
+                    }
+                    switch (temp_func.fun_param.get(i).dimension) {
+                        case 1:
+                            Compiler.llvmPrint("i32 "+func_register.get(i), 1);
+                            break;
+                        case 2:
+                            Compiler.llvmPrint("i32* "+func_register.get(i), 1);
+                            break;
+                    }
+                }
             }
         }
         Compiler.print_syntactic("<FuncRParams>");
