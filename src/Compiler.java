@@ -176,7 +176,9 @@ public class Compiler {
         currentSymbolTable = temp;
     }
 
-    public static void llvmPrint(String word, int stage) throws IOException {
+    public static void llvmPrint(String word, int stage, boolean on) throws IOException {
+        if (!on)
+            return;
         if (stage != 1) {
             writer.append("\t");
         }
@@ -200,6 +202,7 @@ public class Compiler {
 
     public static Register newRegister(Symbol word) {
         currentRegisterTable.map.put(word.word.lexical_content, new Register(currentRegisterTable.map.size()));
+        currentRegisterTable.map.get(word.word.lexical_content).isGlobal = Syntactic.stage == 1;
         return currentRegisterTable.map.get(word.word.lexical_content);
     }
 
@@ -209,6 +212,7 @@ public class Compiler {
 
     public static Register newTempRegister(String word) {
         currentRegisterTable.map.put(word, new Register(currentRegisterTable.map.size()));
+        currentRegisterTable.map.get(word).isGlobal = Syntactic.stage == 1;
         return currentRegisterTable.map.get(word);
     }
 

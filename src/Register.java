@@ -2,6 +2,7 @@ public class Register {
     public int registerNumber;
     public String label;
     public int value;
+    public boolean isGlobal;
 
     public Register(int size) {
         this.registerNumber = size;
