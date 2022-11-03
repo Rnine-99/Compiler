@@ -1,6 +1,8 @@
-int a_v_num;
-int a_v_num_1 = 1, a_v_num_2 = 2;
+void sum(int a, int b) {
+    return ;
+}
 int main() {
-    m_v_num2 = 2;
+    int a, b;
+    sum(a, b);
     return 0;
 }

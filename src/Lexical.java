@@ -15,6 +15,10 @@ public class Lexical {
 
     }
 
+    public Lexical(String expValue) {
+        this.lexical_content = expValue;
+    }
+
     public static boolean isAlpha(int ch) {
         return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_';
     }

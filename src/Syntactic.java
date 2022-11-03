@@ -481,6 +481,7 @@ public class Syntactic {
 
     public static void Stmt() throws IOException {
         int temp_line;
+        String returnValue = null;
         if (current_word.lexical_content.equals("if")) {
             Compiler.print_word(current_word);
             if (!current_word.lexical_content.equals("("))
@@ -589,7 +590,17 @@ public class Syntactic {
             // 函数调用
             if (current_word.lexical_content.equals("(")) {
                 Compiler.previous_word();
-                Exp();
+                String expValue = Exp();
+                Symbol func = Compiler.search_symbol_table(new Lexical(expValue));
+                Compiler.llvmPrint("call ", stage);
+                /*
+                assert func != null;
+                if (func.var_type.equals("void")) {
+                    Compiler.llvmPrint("void @"+expValue+"(", stage);
+                } else {
+                    Compiler.llvmPrint("i32 @"+expValue+"(", stage);
+                }
+                 */
                 Compiler.previous_word();
                 temp_line = current_word.lexical_line;
                 Compiler.current_word();
@@ -613,6 +624,13 @@ public class Syntactic {
                     if (temp_type != null && temp_type.type.equals("const"))
                         Compiler.error_analysis('h', temp_line);
                     if (current_word.lexical_content.equals("getint")) {
+                        if (temp_type != null) {
+                            Register newRegister = Compiler.newTempRegister("getint"+Compiler.currentRegisterTable.map.size());
+                            Compiler.llvmPrint("%"+newRegister.registerNumber+
+                                    " = call i32 @getint()\n", stage);
+                            Compiler.llvmPrint("store i32 %"+newRegister.registerNumber+
+                                    ", i32* %"+temp_type.register.registerNumber+"\n", stage);
+                        }
                         Compiler.print_word(current_word);
                         if (!current_word.lexical_content.equals("("))
                             ERROR();
@@ -625,7 +643,10 @@ public class Syntactic {
                         else
                             Compiler.print_word(current_word);
                     } else {
-                        Exp();
+                        returnValue = Exp();
+                        if (temp_type != null)
+                            Compiler.llvmPrint("store i32 "+returnValue+
+                                ", i32* %"+temp_type.register.registerNumber+"\n", stage);
                     }
                 }
                 temp_line = get_previous_line();
@@ -804,8 +825,10 @@ public class Syntactic {
             int temp = Compiler.current_word;
             Compiler.current_word();
             if (current_word.lexical_content.equals("(")) {
+                // 函数调用
                 Compiler.current_word = temp - 1;
                 Compiler.current_word();
+                // 或许应该在这里进行函数调用？
                 if ((Compiler.search_symbol_table(current_word)) == null)
                     Compiler.error_analysis('c', current_word.lexical_line);
                 else
@@ -815,6 +838,7 @@ public class Syntactic {
                 Compiler.print_word(current_word);
                 if (!current_word.lexical_content.equals(")")) {
                     if (temp_func != null) {
+                        returnValue = temp_func.word.lexical_content;
                         FuncRParams(temp_func);
                     } else {
                         while (!current_word.lexical_content.equals(")")) {
