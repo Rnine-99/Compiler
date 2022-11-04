@@ -17,6 +17,7 @@ public class Syntactic {
     public static ArrayList<String> printf_param = null;
     public static ArrayList<String> func_register = null;
     public static ArrayList<ArrayList<String>> func_stack = new ArrayList<>();
+    public static int func_param_define;
     public static void CompUnit() throws IOException {
         Compiler.llvmPrint("declare i32 @getint()\n"+
                 "declare void @putint(i32)\n"+
@@ -112,13 +113,25 @@ public class Syntactic {
         if (fun_type.equals("int")) {
             fun_type_flag = 1;
             current_func.dimension = 1;
-            fun_if_return = 0;
         } else
             fun_type_flag = 0;
+        fun_if_return = 0;
         last_sentence = null;
         Compiler.llvmPrint(" {\n", 1, true);
         if_block_start = 1;
+        Compiler.newLabelRegister();
+        if_block_start = 0;
+        for (int i = 0;i < current_func.fun_param.size();i ++) {
+            Register paramRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
+            Compiler.llvmPrint("%"+paramRegister.registerNumber+" = alloca i32\n", stage, true);
+            Compiler.llvmPrint("store i32 %"+
+                    current_func.fun_param.get(i).register.registerNumber+
+                    ", i32* %"+paramRegister.registerNumber+"\n", stage, true);
+            current_func.fun_param.get(i).register = paramRegister;
+        }
         Block();
+        if (fun_if_return == 0 && fun_type_flag == 0)
+            Compiler.llvmPrint("ret void\n", stage, true);
         Compiler.llvmPrint("}\n", 1, true);
         Compiler.previous_word();
         if (fun_type_flag == 1 && (last_sentence == null || !last_sentence.lexical_content.equals("return")))
@@ -160,6 +173,8 @@ public class Syntactic {
         Compiler.new_symbol_table();
         Compiler.newRegisterTable();
         if_block_start = 1;
+        Compiler.newLabelRegister();
+        if_block_start = 0;
         Block();
         Compiler.llvmPrint("}\n", 1, true);
         Compiler.previous_word();
@@ -465,10 +480,6 @@ public class Syntactic {
     }
 
     public static void BlockItem() throws IOException {
-        if (if_block_start == 1) {
-            Compiler.newLabelRegister();
-            if_block_start = 0;
-        }
         if (current_word.lexical_content.equals("const") || current_word.lexical_content.equals("int")) {
             Decl();
         } else {
@@ -837,12 +848,12 @@ public class Syntactic {
                     break;
                 case 2:
                     newRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
-                    Compiler.llvmPrint("%"+newRegister.registerNumber+" = div i32 "+returnValue+", "+temp+"\n", stage, on);
+                    Compiler.llvmPrint("%"+newRegister.registerNumber+" = sdiv i32 "+returnValue+", "+temp+"\n", stage, on);
                     newRegister.value = left / right;
                     break;
                 case 3:
                     newRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
-                    Compiler.llvmPrint("%"+newRegister.registerNumber+" = mod i32 "+returnValue+", "+temp+"\n", stage, on);
+                    Compiler.llvmPrint("%"+newRegister.registerNumber+" = srem i32 "+returnValue+", "+temp+"\n", stage, on);
                     newRegister.value = left % right;
                     break;
             }
@@ -869,7 +880,7 @@ public class Syntactic {
         current_word.lexical_content.equals("-") ||
         current_word.lexical_content.equals("!")) {
             UnaryOp();
-            UnaryExp();
+            returnValue = UnaryExp();
         } else if (current_word.lexical_type.equals("IDENFR")) {
             int temp = Compiler.current_word;
             int flag = 0;
@@ -1138,9 +1149,9 @@ public class Syntactic {
             temp = Integer.parseInt(word);
         }
         if (!word.contains("%"))
-            Compiler.llvmPrint("call void @putch i32 "+temp+"\n", stage, true);
+            Compiler.llvmPrint("call void @putch(i32 "+temp+")\n", stage, true);
         else
-            Compiler.llvmPrint("call void @putint i32 "+word+"\n", stage, true);
+            Compiler.llvmPrint("call void @putint(i32 "+word+")\n", stage, true);
     }
 
     public static void UnaryOp() throws IOException {
