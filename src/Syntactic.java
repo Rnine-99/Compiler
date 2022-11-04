@@ -849,12 +849,14 @@ public class Syntactic {
                 case 2:
                     newRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
                     Compiler.llvmPrint("%"+newRegister.registerNumber+" = sdiv i32 "+returnValue+", "+temp+"\n", stage, on);
-                    newRegister.value = left / right;
+                    if (right != 0)
+                        newRegister.value = left / right;
                     break;
                 case 3:
                     newRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
                     Compiler.llvmPrint("%"+newRegister.registerNumber+" = srem i32 "+returnValue+", "+temp+"\n", stage, on);
-                    newRegister.value = left % right;
+                    if (right != 0)
+                        newRegister.value = left % right;
                     break;
             }
             returnValue = "%"+newRegister.registerNumber;
@@ -875,12 +877,24 @@ public class Syntactic {
 
     public static String UnaryExp() throws IOException {
         Symbol temp_func = null;
-        String returnValue = null;
+        String returnValue = null, operator = null;
+        boolean on = stage != 1;
         if (current_word.lexical_content.equals("+") ||
         current_word.lexical_content.equals("-") ||
         current_word.lexical_content.equals("!")) {
-            UnaryOp();
+            operator = UnaryOp();
             returnValue = UnaryExp();
+            if ("-".equals(operator)) {
+                if (returnValue.contains("%")) {
+                    Register tempRegister = Compiler.newTempRegister("%" + Compiler.currentRegisterTable.map.size());
+                    tempRegister.value = -Compiler.currentRegisterTable.map.get(returnValue).value;
+                    Compiler.llvmPrint("%"+tempRegister.registerNumber+
+                            " = sub i32 0, "+returnValue+"\n", stage, on);
+                    returnValue = "%"+tempRegister.registerNumber;
+                } else {
+                    returnValue = String.valueOf(-Integer.parseInt(returnValue));
+                }
+            }
         } else if (current_word.lexical_type.equals("IDENFR")) {
             int temp = Compiler.current_word;
             int flag = 0;
@@ -1154,14 +1168,18 @@ public class Syntactic {
             Compiler.llvmPrint("call void @putint(i32 "+word+")\n", stage, true);
     }
 
-    public static void UnaryOp() throws IOException {
+    public static String UnaryOp() throws IOException {
+        String operator = null;
         if (!(current_word.lexical_content.equals("+") ||
                 current_word.lexical_content.equals("-") ||
                 current_word.lexical_content.equals("!")))
             ERROR();
-        else
+        else {
+            operator = current_word.lexical_content;
             Compiler.print_word(current_word);
+        }
         Compiler.print_syntactic("<UnaryOp>");
+        return operator;
     }
 
     public static void FuncRParams(Symbol temp_func) throws IOException {

@@ -2,14 +2,13 @@ int main(){
 int a=1;
 int b=2;
 int c;
-//c=a/b*a;
-//c=a+b+a+2;
-//c=a%b/a*b/2;
+c=a/b*a;
+c=a+b+a+2;
+c=a%b/a*b/2;
 c=a+(-2);
-/*printf("%d\n",c);
+printf("%d\n",c);
 c=a-(-2);
 printf("%d\n",c);
 printf("%d",a);
-*/
 return 0;
 }
