@@ -1,3 +1,4 @@
+import java.awt.color.CMMException;
 import java.io.IOException;
 import java.util.ArrayList;
 
@@ -885,14 +886,31 @@ public class Syntactic {
     }
 
     public static String LOrExp() throws IOException {
-        String returnValue = null;
+        String returnValue = null, tempValue = null;
+        Register tempLabel = null, tempRegister = null;
+        boolean on = stage != 1;
         returnValue = LAndExp();
+        tempValue = returnValue;
         while (current_word.lexical_content.equals("||")) {
+            if (!Compiler.buffer.get(Compiler.bufferFlag - 1).contains("icmp")) {
+                tempRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
+                Compiler.llvmPrint("%"+tempRegister.registerNumber+" = icmp ne i32 "+tempValue+", 0\n", stage, on);
+            }
+            Compiler.llvmPrint("br i1 "+tempValue+" label <if>, label <next lor>\n", stage, on);
             Compiler.print_syntactic("<LOrExp>");
             Compiler.print_word(current_word);
-            returnValue = LAndExp();
-            Compiler.llvmPrint("br i1 "+returnValue+"label<next>, label<next>", stage, true);
+            tempLabel = Compiler.newLabelRegister();
+            Compiler.buffer.set(Compiler.bufferFlag - 1,
+                    Compiler.buffer.get(Compiler.bufferFlag - 1).replace("<next lor>", "%"+tempLabel.registerNumber));
+            Compiler.llvmPrint("\n; <label>:"+tempLabel.registerNumber+":\n", stage, on);
+            tempValue = LAndExp();
         }
+        if (!Compiler.buffer.get(Compiler.bufferFlag - 1).contains("icmp")) {
+            tempRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
+            Compiler.llvmPrint("%"+tempRegister.registerNumber+" = icmp ne i32 "+tempValue+", 0\n", stage, on);
+            tempValue = "%"+tempRegister.registerNumber;
+        }
+        Compiler.llvmPrint("br i1 "+tempValue+" label <if>, label <else>\n", stage, on);
         Compiler.print_syntactic("<LOrExp>");
         return returnValue;
     }
@@ -1110,6 +1128,8 @@ public class Syntactic {
                     Compiler.buffer.get(Compiler.bufferFlag - 1).replace("<next add>", "%"+tempLabel.registerNumber));
             Compiler.llvmPrint("\n; <label>:"+tempLabel.registerNumber+":\n", stage, true);
             tempValue = EqExp();
+            // 好像条件表达式不需要计算具体值
+            /*
             Register newRegister = null;
             int left = 0, right = 0;
             if (!returnValue.contains("%"))
@@ -1122,6 +1142,7 @@ public class Syntactic {
                 right = Compiler.currentRegisterTable.map.get(tempValue).value;
             newRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
             //Compiler.llvmPrint("%"+newRegister.registerNumber+" = ");
+             */
         }
         if (!Compiler.buffer.get(Compiler.bufferFlag - 1).contains("icmp")) {
             tempRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
