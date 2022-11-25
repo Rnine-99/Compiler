@@ -19,6 +19,7 @@ public class Syntactic {
     public static ArrayList<String> func_register = null;
     public static ArrayList<ArrayList<String>> func_stack = new ArrayList<>();
     public static int func_param_define;
+    public static int if_stack = 0;
     public static void CompUnit() throws IOException {
         Compiler.llvmPrint("declare i32 @getint()\n"+
                 "declare void @putint(i32)\n"+
@@ -523,14 +524,15 @@ public class Syntactic {
         int temp_line;
         String returnValue = null;
         if (current_word.lexical_content.equals("if")) {
-            int ifLabel = 0, elseLabel = 0, ifBr = 0, elseBr = 0;
+            if_stack ++;
+            int ifLabel = 0, elseLabel = 0, ifBr = 0, elseBr = 0, elseFlag = 0;
             Compiler.print_word(current_word);
             if (!current_word.lexical_content.equals("("))
                 ERROR();
             else
                 Compiler.print_word(current_word);
             returnValue = Cond();
-            //Compiler.llvmPrint("br i1 "+returnValue+", label <if>, label <else>\n", stage, true);
+            Compiler.llvmPrint("br i1 "+returnValue+", label <if"+if_stack+">, label <else"+if_stack+">\n", stage, true);
             if (!current_word.lexical_content.equals(")")) {
                 temp_line = get_previous_line();
                 Compiler.error_analysis('j', temp_line);
@@ -538,15 +540,26 @@ public class Syntactic {
             else
                 Compiler.print_word(current_word);
             Register tempLabel = Compiler.newLabelRegister();
-            //ifLabel = Compiler.bufferFlag;
+            ifLabel = tempLabel.registerNumber;
+            for (int i = 0;i < Compiler.bufferFlag;i ++) {
+                if (Compiler.buffer.get(i).contains("<if"+if_stack+">"))
+                    Compiler.buffer.set(i,
+                            Compiler.buffer.get(i).replace("<if"+if_stack+">", "%"+ifLabel));
+            }
             Compiler.llvmPrint("\n; <label>:"+tempLabel.registerNumber+":\n", 1, true);
             Stmt();
             ifBr = Compiler.bufferFlag;
             Compiler.llvmPrint("br label %", stage, true);
             if (current_word.lexical_content.equals("else")) {
+                elseFlag = 1;
                 Compiler.print_word(current_word);
                 tempLabel = Compiler.newLabelRegister();
-                //elseLabel = Compiler.bufferFlag;
+                elseLabel = tempLabel.registerNumber;
+                for (int i = 0;i < Compiler.bufferFlag;i ++) {
+                    if (Compiler.buffer.get(i).contains("<else"+if_stack+">"))
+                        Compiler.buffer.set(i,
+                                Compiler.buffer.get(i).replace("<else"+if_stack+">", "%"+elseLabel));
+                }
                 Compiler.llvmPrint("\n; <label>:"+tempLabel.registerNumber+":\n", 1, true);
                 Stmt();
                 elseBr = Compiler.bufferFlag;
@@ -554,9 +567,16 @@ public class Syntactic {
             }
             tempLabel = Compiler.newLabelRegister();
             // 补全对应label
+            for (int i = 0;i < Compiler.bufferFlag;i ++) {
+                if (Compiler.buffer.get(i).contains("<else"+if_stack+">"))
+                    Compiler.buffer.set(i,
+                            Compiler.buffer.get(i).replace("<else"+if_stack+">", "%"+tempLabel.registerNumber));
+            }
             Compiler.buffer.set(ifBr, Compiler.buffer.get(ifBr)+tempLabel.registerNumber+"\n");
-            Compiler.buffer.set(elseBr, Compiler.buffer.get(elseBr)+tempLabel.registerNumber+"\n");
+            if (elseFlag == 1)
+                Compiler.buffer.set(elseBr, Compiler.buffer.get(elseBr)+tempLabel.registerNumber+"\n");
             Compiler.llvmPrint("\n; <label>:"+tempLabel.registerNumber+":\n", 1, true);
+            if_stack --;
         } else if (current_word.lexical_content.equals("{")) {
             Compiler.new_symbol_table();
             Block();
@@ -818,7 +838,7 @@ public class Syntactic {
 
     public static String Cond() throws IOException {
         String returnValue = null;
-        LOrExp();
+        returnValue = LOrExp();
         Compiler.print_syntactic("<Cond>");
         return returnValue;
     }
@@ -896,7 +916,7 @@ public class Syntactic {
                 tempRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
                 Compiler.llvmPrint("%"+tempRegister.registerNumber+" = icmp ne i32 "+tempValue+", 0\n", stage, on);
             }
-            Compiler.llvmPrint("br i1 "+tempValue+" label <if>, label <next lor>\n", stage, on);
+            Compiler.llvmPrint("br i1 "+tempValue+" label <if"+if_stack+">, label <next lor>\n", stage, on);
             Compiler.print_syntactic("<LOrExp>");
             Compiler.print_word(current_word);
             tempLabel = Compiler.newLabelRegister();
@@ -910,9 +930,8 @@ public class Syntactic {
             Compiler.llvmPrint("%"+tempRegister.registerNumber+" = icmp ne i32 "+tempValue+", 0\n", stage, on);
             tempValue = "%"+tempRegister.registerNumber;
         }
-        Compiler.llvmPrint("br i1 "+tempValue+" label <if>, label <else>\n", stage, on);
         Compiler.print_syntactic("<LOrExp>");
-        return returnValue;
+        return tempValue;
     }
 
     public static String UnaryExp() throws IOException {
@@ -1120,7 +1139,7 @@ public class Syntactic {
                 tempRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
                 Compiler.llvmPrint("%"+tempRegister.registerNumber+" = icmp ne i32 "+tempValue+", 0\n", stage, true);
             }
-            Compiler.llvmPrint("br i1 "+tempValue+" label <next add>, label <else>\n", stage, true);
+            Compiler.llvmPrint("br i1 "+tempValue+" label <next add>, label <else"+if_stack+">\n", stage, true);
             Compiler.print_syntactic("<LAndExp>");
             Compiler.print_word(current_word);
             tempLabel = Compiler.newLabelRegister();
@@ -1149,9 +1168,8 @@ public class Syntactic {
             Compiler.llvmPrint("%"+tempRegister.registerNumber+" = icmp ne i32 "+tempValue+", 0\n", stage, true);
             tempValue = "%"+tempRegister.registerNumber;
         }
-        Compiler.llvmPrint("br i1 "+tempValue+" label<if>, label<else>\n", stage, true);
         Compiler.print_syntactic("<LAndExp>");
-        return returnValue;
+        return tempValue;
     }
 
     public static String EqExp() throws IOException {
