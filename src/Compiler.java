@@ -16,6 +16,8 @@ public class Compiler {
     public static int current_word = 0;
     public static SymbolTable currentSymbolTable = new SymbolTable();
     public static RegisterTable currentRegisterTable = new RegisterTable();
+    public static ArrayList<String> buffer = new ArrayList<>();
+    public static int bufferFlag = 0;
 
     public static void add_new_word(String word, String type, int line) {
         if (word.equals("") || word.equals("//") || word.equals("/*") || type.equals("NULL"))
@@ -140,6 +142,9 @@ public class Compiler {
         output = Files.newOutputStream(Paths.get("llvm_ir.txt"));
         writer = new OutputStreamWriter(output, StandardCharsets.UTF_8);
         Syntactic.CompUnit();
+        for (String i : buffer) {
+            writer.append(i);
+        }
         writer.close();
     }
 
@@ -177,12 +182,15 @@ public class Compiler {
     }
 
     public static void llvmPrint(String word, int stage, boolean on) throws IOException {
+        String temp = new String();
         if (!on)
             return;
         if (stage != 1) {
-            writer.append("\t");
+            temp += "\t";
         }
-        writer.append(word);
+        temp += word;
+        buffer.add(temp);
+        bufferFlag ++;
     }
 
     public static Symbol search_symbol_table(Lexical word) {
@@ -206,8 +214,9 @@ public class Compiler {
         return currentRegisterTable.map.get(word.word.lexical_content);
     }
 
-    public static void newLabelRegister() {
+    public static Register newLabelRegister() {
         currentRegisterTable.map.put("label"+currentRegisterTable.map.size(), new Register(currentRegisterTable.map.size()));
+        return currentRegisterTable.map.get("label"+(currentRegisterTable.map.size() - 1));
     }
 
     public static Register newTempRegister(String word) {

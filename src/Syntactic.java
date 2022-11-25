@@ -522,23 +522,40 @@ public class Syntactic {
         int temp_line;
         String returnValue = null;
         if (current_word.lexical_content.equals("if")) {
+            int ifLabel = 0, elseLabel = 0, ifBr = 0, elseBr = 0;
             Compiler.print_word(current_word);
             if (!current_word.lexical_content.equals("("))
                 ERROR();
             else
                 Compiler.print_word(current_word);
-            Cond();
+            returnValue = Cond();
+            //Compiler.llvmPrint("br i1 "+returnValue+", label <if>, label <else>\n", stage, true);
             if (!current_word.lexical_content.equals(")")) {
                 temp_line = get_previous_line();
                 Compiler.error_analysis('j', temp_line);
             }
             else
                 Compiler.print_word(current_word);
+            Register tempLabel = Compiler.newLabelRegister();
+            //ifLabel = Compiler.bufferFlag;
+            Compiler.llvmPrint("\n; <label>:"+tempLabel.registerNumber+":\n", 1, true);
             Stmt();
+            ifBr = Compiler.bufferFlag;
+            Compiler.llvmPrint("br label %", stage, true);
             if (current_word.lexical_content.equals("else")) {
                 Compiler.print_word(current_word);
+                tempLabel = Compiler.newLabelRegister();
+                //elseLabel = Compiler.bufferFlag;
+                Compiler.llvmPrint("\n; <label>:"+tempLabel.registerNumber+":\n", 1, true);
                 Stmt();
+                elseBr = Compiler.bufferFlag;
+                Compiler.llvmPrint("br label %", stage, true);
             }
+            tempLabel = Compiler.newLabelRegister();
+            // 补全对应label
+            Compiler.buffer.set(ifBr, Compiler.buffer.get(ifBr)+tempLabel.registerNumber+"\n");
+            Compiler.buffer.set(elseBr, Compiler.buffer.get(elseBr)+tempLabel.registerNumber+"\n");
+            Compiler.llvmPrint("\n; <label>:"+tempLabel.registerNumber+":\n", 1, true);
         } else if (current_word.lexical_content.equals("{")) {
             Compiler.new_symbol_table();
             Block();
@@ -798,9 +815,11 @@ public class Syntactic {
         return returnValue;
     }
 
-    public static void Cond() throws IOException {
+    public static String Cond() throws IOException {
+        String returnValue = null;
         LOrExp();
         Compiler.print_syntactic("<Cond>");
+        return returnValue;
     }
 
     public static String Exp() throws IOException {
@@ -865,14 +884,17 @@ public class Syntactic {
         return returnValue;
     }
 
-    public static void LOrExp() throws IOException {
-        LAndExp();
+    public static String LOrExp() throws IOException {
+        String returnValue = null;
+        returnValue = LAndExp();
         while (current_word.lexical_content.equals("||")) {
             Compiler.print_syntactic("<LOrExp>");
             Compiler.print_word(current_word);
-            LAndExp();
+            returnValue = LAndExp();
+            Compiler.llvmPrint("br i1 "+returnValue+"label<next>, label<next>", stage, true);
         }
         Compiler.print_syntactic("<LOrExp>");
+        return returnValue;
     }
 
     public static String UnaryExp() throws IOException {
@@ -1069,37 +1091,175 @@ public class Syntactic {
         return returnValue;
     }
 
-    public static void LAndExp() throws IOException {
-        EqExp();
+    public static String LAndExp() throws IOException {
+        String returnValue ,tempValue;
+        Register tempLabel = null, tempRegister = null;
+        boolean on = stage != 1;
+        returnValue = EqExp();
+        tempValue = returnValue;
         while (current_word.lexical_content.equals("&&")) {
+            if (!Compiler.buffer.get(Compiler.bufferFlag - 1).contains("icmp")) {
+                tempRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
+                Compiler.llvmPrint("%"+tempRegister.registerNumber+" = icmp ne i32 "+tempValue+", 0\n", stage, true);
+            }
+            Compiler.llvmPrint("br i1 "+tempValue+" label <next add>, label <else>\n", stage, true);
             Compiler.print_syntactic("<LAndExp>");
             Compiler.print_word(current_word);
-            EqExp();
+            tempLabel = Compiler.newLabelRegister();
+            Compiler.buffer.set(Compiler.bufferFlag - 1,
+                    Compiler.buffer.get(Compiler.bufferFlag - 1).replace("<next add>", "%"+tempLabel.registerNumber));
+            Compiler.llvmPrint("\n; <label>:"+tempLabel.registerNumber+":\n", stage, true);
+            tempValue = EqExp();
+            Register newRegister = null;
+            int left = 0, right = 0;
+            if (!returnValue.contains("%"))
+                left = Integer.parseInt(returnValue);
+            else
+                left = Compiler.currentRegisterTable.map.get(returnValue).value;
+            if (!tempValue.contains("%"))
+                right = Integer.parseInt(tempValue);
+            else
+                right = Compiler.currentRegisterTable.map.get(tempValue).value;
+            newRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
+            //Compiler.llvmPrint("%"+newRegister.registerNumber+" = ");
         }
+        if (!Compiler.buffer.get(Compiler.bufferFlag - 1).contains("icmp")) {
+            tempRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
+            Compiler.llvmPrint("%"+tempRegister.registerNumber+" = icmp ne i32 "+tempValue+", 0\n", stage, true);
+            tempValue = "%"+tempRegister.registerNumber;
+        }
+        Compiler.llvmPrint("br i1 "+tempValue+" label<if>, label<else>\n", stage, true);
         Compiler.print_syntactic("<LAndExp>");
+        return returnValue;
     }
 
-    public static void EqExp() throws IOException {
-        RelExp();
-        while (current_word.lexical_content.equals("==") || current_word.lexical_content.equals("!=")) {
+    public static String EqExp() throws IOException {
+        String returnValue;
+        int operator = 0;
+        boolean on = stage != 1;
+        returnValue = RelExp();
+        while (current_word.lexical_content.equals("==") ||
+                current_word.lexical_content.equals("!=")) {
+            switch (current_word.lexical_content) {
+                case "==":
+                    operator = 1;
+                    break;
+                case "!=":
+                    operator = 2;
+                    break;
+            }
             Compiler.print_syntactic("<EqExp>");
             Compiler.print_word(current_word);
+            String tempValue = RelExp();
+            Register newRegister = null;
+            int left = 0, right = 0;
+            if (!returnValue.contains("%"))
+                left = Integer.parseInt(returnValue);
+            else
+                left = Compiler.currentRegisterTable.map.get(returnValue).value;
+            if (!tempValue.contains("%"))
+                right = Integer.parseInt(tempValue);
+            else
+                right = Compiler.currentRegisterTable.map.get(tempValue).value;
+            switch (operator) {
+                case 1:
+                    newRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
+                    Compiler.llvmPrint("%"+newRegister.registerNumber+" = icmp eq i32 "+returnValue+", "+tempValue+"\n", stage, on);
+                    if (left == right)
+                        newRegister.value = 1;
+                    else
+                        newRegister.value = 0;
+                    break;
+                case 2:
+                    newRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
+                    Compiler.llvmPrint("%"+newRegister.registerNumber+" = icmp ne i32 "+returnValue+", "+tempValue+"\n", stage, on);
+                    if (left != right)
+                        newRegister.value = 1;
+                    else
+                        newRegister.value = 0;
+                    break;
+            }
+            returnValue = "%"+newRegister.registerNumber;
             RelExp();
         }
         Compiler.print_syntactic("<EqExp>");
+        return returnValue;
     }
 
-    public static void RelExp() throws IOException {
-        AddExp();
+    public static String RelExp() throws IOException {
+        String returnValue;
+        int operator = 0;
+        returnValue = AddExp();
+        boolean on = stage != 1;
         while (current_word.lexical_content.equals("<") ||
                 current_word.lexical_content.equals(">") ||
                 current_word.lexical_content.equals("<=") ||
                 current_word.lexical_content.equals(">=")) {
+            switch (current_word.lexical_content) {
+                case "<":
+                    operator = 1;
+                    break;
+                case ">":
+                    operator = 2;
+                    break;
+                case "<=":
+                    operator = 3;
+                    break;
+                case ">=":
+                    operator = 4;
+                    break;
+            }
             Compiler.print_syntactic("<RelExp>");
             Compiler.print_word(current_word);
-            AddExp();
+            String tempValue = AddExp();
+            Register newRegister = null;
+            int left = 0, right = 0;
+            if (!returnValue.contains("%"))
+                left = Integer.parseInt(returnValue);
+            else
+                left = Compiler.currentRegisterTable.map.get(returnValue).value;
+            if (!tempValue.contains("%"))
+                right = Integer.parseInt(tempValue);
+            else
+                right = Compiler.currentRegisterTable.map.get(tempValue).value;
+            switch (operator) {
+                case 1:
+                    newRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
+                    Compiler.llvmPrint("%"+newRegister.registerNumber+" = icmp slt i32 "+returnValue+", "+tempValue+"\n", stage, on);
+                    if (left < right)
+                        newRegister.value = 1;
+                    else
+                        newRegister.value = 0;
+                    break;
+                case 2:
+                    newRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
+                    Compiler.llvmPrint("%"+newRegister.registerNumber+" = icmp sgt i32 "+returnValue+", "+tempValue+"\n", stage, on);
+                    if (left > right)
+                        newRegister.value = 1;
+                    else
+                        newRegister.value = 0;
+                    break;
+                case 3:
+                    newRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
+                    Compiler.llvmPrint("%"+newRegister.registerNumber+" = icmp sle i32 "+returnValue+", "+tempValue+"\n", stage, on);
+                    if (left <= right)
+                        newRegister.value = 1;
+                    else
+                        newRegister.value = 0;
+                    break;
+                case 4:
+                    newRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
+                    Compiler.llvmPrint("%"+newRegister.registerNumber+" = icmp sge i32 "+returnValue+", "+tempValue+"\n", stage, on);
+                    if (left >= right)
+                        newRegister.value = 1;
+                    else
+                        newRegister.value = 0;
+                    break;
+            }
+            returnValue = "%"+newRegister.registerNumber;
         }
         Compiler.print_syntactic("<RelExp>");
+        return returnValue;
     }
 
     public static void FormatString() throws IOException {
