@@ -8,6 +8,7 @@ public class Symbol {
     public String var_type;
     // 返回的具体数据类型如int, void等
     public int dimension;
+    public ArrayList<Integer> dimensionValue = new ArrayList<>();
     public ArrayList<Integer> fun_dimension = new ArrayList<>();
     public Register register;
 

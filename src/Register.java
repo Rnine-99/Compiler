@@ -1,7 +1,9 @@
+import java.util.ArrayList;
+
 public class Register {
     public int registerNumber;
     public String label;
-    public int value;
+    public ArrayList<Integer> value = new ArrayList<>();
     public boolean isGlobal;
 
     public Register(int size) {
