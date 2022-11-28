@@ -383,6 +383,7 @@ public class Syntactic {
                         Compiler.llvmPrint("i32 "+constValue.get(i), stage, true);
                     }
                     Compiler.llvmPrint("]\n", stage, true);
+                    const_var.register.value = constValue;
                 } else {
                     Compiler.llvmPrint("[", stage, true);
                     int b = dimensionValue.get(1);
@@ -400,6 +401,7 @@ public class Syntactic {
                         Compiler.llvmPrint("]", stage, true);
                     }
                     Compiler.llvmPrint("]\n", stage, true);
+                    const_var.register.value = constValue;
                 }
             } else {
                 if (temp_dimension == 1) {
@@ -411,6 +413,22 @@ public class Syntactic {
                         Compiler.llvmPrint("store i32 " + tempRegister.value + ", i32* %" + const_var.register.registerNumber + "\n", stage, true);
                         const_var.register.value = tempRegister.value;
                     }
+                } else {
+                    Register arrayStart = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
+                    Compiler.llvmPrint("%"+arrayStart.registerNumber+" = getelementptr ["+dimensionValue.get(0)+" x i32], [" +
+                            dimensionValue.get(0)+" x i32]* %"+const_var.register.registerNumber, stage, true);
+                    for (int i = 0;i < temp_dimension;i ++) {
+                        Compiler.llvmPrint(", i32 0", 1, true);
+                    }
+                    Compiler.llvmPrint("\n", 1, true);
+                    Compiler.llvmPrint("store i32 "+constValue.get(0)+", i32* %"+arrayStart.registerNumber+"\n", stage, true);
+                    for (int i = 1;i < constValue.size();i ++) {
+                        Register arrayTemp = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
+                        Compiler.llvmPrint("%"+arrayTemp.registerNumber+" = getelementptr i32, i32* %"+arrayStart.registerNumber
+                                +", i32 "+i+"\n", stage, true);
+                        Compiler.llvmPrint("store i32 "+constValue.get(i)+", i32* %"+arrayTemp.registerNumber+"\n", stage, true);
+                    }
+                    const_var.register.value = constValue;
                 }
             }
         }
@@ -512,6 +530,8 @@ public class Syntactic {
                     Compiler.llvmPrint("i32 "+constValue.get(i), stage, true);
                 }
                 Compiler.llvmPrint("]\n", stage, true);
+                assert var != null;
+                var.register.value = constValue;
             } else {
                 Compiler.llvmPrint("[", stage, true);
                 int b = dimensionValue.get(1);
@@ -529,6 +549,8 @@ public class Syntactic {
                     Compiler.llvmPrint("]", stage, true);
                 }
                 Compiler.llvmPrint("]\n", stage, true);
+                assert var != null;
+                var.register.value = constValue;
             }
         } else {
             if (temp_dimension == 1) {
@@ -540,6 +562,23 @@ public class Syntactic {
                     Register tempRegister = Compiler.currentRegisterTable.map.get(temp);
                     var.register.value = tempRegister.value;
                 }
+            } else {
+                Register arrayStart = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
+                assert var != null;
+                Compiler.llvmPrint("%"+arrayStart.registerNumber+" = getelementptr ["+dimensionValue.get(0)+" x i32], [" +
+                        dimensionValue.get(0)+" x i32]* %"+var.register.registerNumber, stage, true);
+                for (int i = 0;i < temp_dimension;i ++) {
+                    Compiler.llvmPrint(", i32 0", 1, true);
+                }
+                Compiler.llvmPrint("\n", 1, true);
+                Compiler.llvmPrint("store i32 "+constValue.get(0)+", i32* %"+arrayStart.registerNumber+"\n", stage, true);
+                for (int i = 1;i < constValue.size();i ++) {
+                    Register arrayTemp = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
+                    Compiler.llvmPrint("%"+arrayTemp.registerNumber+" = getelementptr i32, i32* %"+arrayStart.registerNumber
+                    +", i32 "+i+"\n", stage, true);
+                    Compiler.llvmPrint("store i32 "+constValue.get(i)+", i32* %"+arrayTemp.registerNumber+"\n", stage, true);
+                }
+                var.register.value = constValue;
             }
         }
         Compiler.print_syntactic("<VarDef>");
@@ -883,19 +922,9 @@ public class Syntactic {
             Compiler.print_word(current_word);
             if (!current_word.lexical_content.equals("}")) {
                 returnValue = InitVal();
-                if (returnValue.contains("%")) {
-                    constValue.add(Compiler.currentRegisterTable.map.get(returnValue).value.get(0));
-                } else {
-                    constValue.add(Integer.parseInt(returnValue));
-                }
                 while (current_word.lexical_content.equals(",")) {
                     Compiler.print_word(current_word);
                     returnValue = InitVal();
-                    if (returnValue.contains("%")) {
-                        constValue.add(Compiler.currentRegisterTable.map.get(returnValue).value.get(0));
-                    } else {
-                        constValue.add(Integer.parseInt(returnValue));
-                    }
                 }
             }
             if (current_word.lexical_content.equals("}")) {
@@ -904,6 +933,11 @@ public class Syntactic {
                 ERROR();
         } else {
             returnValue = Exp();
+            if (returnValue.contains("%")) {
+                constValue.add(Compiler.currentRegisterTable.map.get(returnValue).value.get(0));
+            } else {
+                constValue.add(Integer.parseInt(returnValue));
+            }
         }
         Compiler.print_syntactic("<InitVal>");
         return returnValue;
