@@ -14,4 +14,8 @@ public class Register {
         this.registerNumber = registerNumber;
         this.label = label;
     }
+
+    public Register() {
+
+    }
 }

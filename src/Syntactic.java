@@ -1,4 +1,3 @@
-import java.awt.color.CMMException;
 import java.io.IOException;
 import java.util.ArrayList;
 
@@ -295,8 +294,7 @@ public class Syntactic {
     public static void ConstDef() throws IOException {
         Symbol const_var = null;
         int temp_dimension = 1;
-        String tempValue = null;
-        ArrayList<Integer> dimensionValue = new ArrayList<>();
+        String tempValue;
         if (Compiler.currentSymbolTable.map.get(current_word.lexical_content) != null)
             Compiler.error_analysis('b', current_word.lexical_line);
         else {
@@ -305,6 +303,7 @@ public class Syntactic {
         }
         Ident();
         while (!current_word.lexical_content.equals("=")) {
+            assert const_var != null;
             if (!current_word.lexical_content.equals("["))
                 ERROR();
             else {
@@ -313,9 +312,9 @@ public class Syntactic {
             }
             tempValue = ConstExp();
             if (tempValue.contains("%")) {
-                dimensionValue.add(Compiler.currentRegisterTable.map.get(tempValue).value.get(0));
+                const_var.dimensionValue.add(Compiler.currentRegisterTable.map.get(tempValue).value.get(0));
             } else {
-                dimensionValue.add(Integer.parseInt(tempValue));
+                const_var.dimensionValue.add(Integer.parseInt(tempValue));
             }
             if (!current_word.lexical_content.equals("]")) {
                 int temp_line = get_previous_line();
@@ -336,11 +335,11 @@ public class Syntactic {
                     Compiler.llvmPrint("@"+const_var.word.lexical_content+" = dso_local constant i32 ", stage, true);
                 else {
                     Compiler.llvmPrint("@" + const_var.word.lexical_content + " = dso_local constant ", stage, true);
-                    for (Integer integer : dimensionValue) {
+                    for (Integer integer : const_var.dimensionValue) {
                         Compiler.llvmPrint("[" + integer + " x ", 1, true);
                     }
                     Compiler.llvmPrint("i32", 1, true);
-                    for (int i = dimensionValue.size() - 1; i >= 0; i--)
+                    for (int i = const_var.dimensionValue.size() - 1; i >= 0; i--)
                         Compiler.llvmPrint("]", 1, true);
                     Compiler.llvmPrint(" ", stage, true);
                 }
@@ -350,11 +349,11 @@ public class Syntactic {
                     Compiler.llvmPrint("%"+Compiler.currentRegisterTable.map.size()+" = alloca i32\n", stage, true);
                 else if (temp_dimension == 2) {
                     Compiler.llvmPrint("%" + Compiler.currentRegisterTable.map.size() + " = alloca ", stage, true);
-                    for (Integer integer : dimensionValue) {
+                    for (Integer integer : const_var.dimensionValue) {
                         Compiler.llvmPrint("[" + integer + " x ", 1, true);
                     }
                     Compiler.llvmPrint("i32", 1, true);
-                    for (int i = dimensionValue.size() - 1; i >= 0; i--)
+                    for (int i = const_var.dimensionValue.size() - 1; i >= 0; i--)
                         Compiler.llvmPrint("]", 1, true);
                     //Compiler.llvmPrint();
                 }
@@ -386,8 +385,8 @@ public class Syntactic {
                     const_var.register.value = constValue;
                 } else {
                     Compiler.llvmPrint("[", stage, true);
-                    int b = dimensionValue.get(1);
-                    for (int i = 0;i < dimensionValue.get(0);i ++) {
+                    int b = const_var.dimensionValue.get(1);
+                    for (int i = 0;i < const_var.dimensionValue.get(0);i ++) {
                         if (i != 0) {
                             Compiler.llvmPrint(", ", stage, true);
                         }
@@ -415,8 +414,8 @@ public class Syntactic {
                     }
                 } else {
                     Register arrayStart = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
-                    Compiler.llvmPrint("%"+arrayStart.registerNumber+" = getelementptr ["+dimensionValue.get(0)+" x i32], [" +
-                            dimensionValue.get(0)+" x i32]* %"+const_var.register.registerNumber, stage, true);
+                    Compiler.llvmPrint("%"+arrayStart.registerNumber+" = getelementptr ["+const_var.dimensionValue.get(0)+" x i32], [" +
+                            const_var.dimensionValue.get(0)+" x i32]* %"+const_var.register.registerNumber, stage, true);
                     for (int i = 0;i < temp_dimension;i ++) {
                         Compiler.llvmPrint(", i32 0", 1, true);
                     }
@@ -438,8 +437,7 @@ public class Syntactic {
     public static void VarDef() throws IOException {
         Symbol var = null;
         int temp_dimension = 1;
-        String tempValue = null;
-        ArrayList<Integer> dimensionValue = new ArrayList<>();
+        String tempValue;
         if (Compiler.currentSymbolTable.map.get(current_word.lexical_content) != null)
             Compiler.error_analysis('b', current_word.lexical_line);
         else {
@@ -448,13 +446,14 @@ public class Syntactic {
         }
         Ident();
         while (current_word.lexical_content.equals("[")) {
+            assert var != null;
             temp_dimension ++;
             Compiler.print_word(current_word);
             tempValue = ConstExp();
             if (tempValue.contains("%")) {
-                dimensionValue.add(Compiler.currentRegisterTable.map.get(tempValue).value.get(0));
+                var.dimensionValue.add(Compiler.currentRegisterTable.map.get(tempValue).value.get(0));
             } else {
-                dimensionValue.add(Integer.parseInt(tempValue));
+                var.dimensionValue.add(Integer.parseInt(tempValue));
             }
             if (!current_word.lexical_content.equals("]")) {
                 int temp_line = get_previous_line();
@@ -470,11 +469,11 @@ public class Syntactic {
                     Compiler.llvmPrint("@"+var.word.lexical_content+" = dso_local global i32 ", stage, true);
                 } else {
                     Compiler.llvmPrint("@"+var.word.lexical_content+" = dso_local global ", stage, true);
-                    for (Integer integer : dimensionValue) {
+                    for (Integer integer : var.dimensionValue) {
                         Compiler.llvmPrint("[" + integer + " x ", 1, true);
                     }
                     Compiler.llvmPrint("i32", 1, true);
-                    for (int i = dimensionValue.size() - 1;i >= 0;i --)
+                    for (int i = var.dimensionValue.size() - 1;i >= 0;i --)
                         Compiler.llvmPrint("]", 1, true);
                     Compiler.llvmPrint(" ", 1, true);
                 }
@@ -483,11 +482,11 @@ public class Syntactic {
                     Compiler.llvmPrint("%"+Compiler.currentRegisterTable.map.size()+" = alloca i32\n", stage, true);
                 } else {
                     Compiler.llvmPrint("%"+Compiler.currentRegisterTable.map.size()+" = alloca ", stage, true);
-                    for (Integer integer : dimensionValue) {
+                    for (Integer integer : var.dimensionValue) {
                         Compiler.llvmPrint("[" + integer + " x ", 1, true);
                     }
                     Compiler.llvmPrint("i32", 1, true);
-                    for (int i = dimensionValue.size() - 1;i >= 0;i --)
+                    for (int i = var.dimensionValue.size() - 1;i >= 0;i --)
                         Compiler.llvmPrint("]", 1, true);
                     Compiler.llvmPrint("\n", 1, true);
                 }
@@ -530,12 +529,11 @@ public class Syntactic {
                     Compiler.llvmPrint("i32 "+constValue.get(i), stage, true);
                 }
                 Compiler.llvmPrint("]\n", stage, true);
-                assert var != null;
                 var.register.value = constValue;
             } else {
                 Compiler.llvmPrint("[", stage, true);
-                int b = dimensionValue.get(1);
-                for (int i = 0;i < dimensionValue.get(0);i ++) {
+                int b = var.dimensionValue.get(1);
+                for (int i = 0;i < var.dimensionValue.get(0);i ++) {
                     if (i != 0) {
                         Compiler.llvmPrint(", ", stage, true);
                     }
@@ -549,7 +547,6 @@ public class Syntactic {
                     Compiler.llvmPrint("]", stage, true);
                 }
                 Compiler.llvmPrint("]\n", stage, true);
-                assert var != null;
                 var.register.value = constValue;
             }
         } else {
@@ -564,9 +561,8 @@ public class Syntactic {
                 }
             } else {
                 Register arrayStart = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
-                assert var != null;
-                Compiler.llvmPrint("%"+arrayStart.registerNumber+" = getelementptr ["+dimensionValue.get(0)+" x i32], [" +
-                        dimensionValue.get(0)+" x i32]* %"+var.register.registerNumber, stage, true);
+                Compiler.llvmPrint("%"+arrayStart.registerNumber+" = getelementptr ["+var.dimensionValue.get(0)+" x i32], [" +
+                        var.dimensionValue.get(0)+" x i32]* %"+var.register.registerNumber, stage, true);
                 for (int i = 0;i < temp_dimension;i ++) {
                     Compiler.llvmPrint(", i32 0", 1, true);
                 }
@@ -678,10 +674,10 @@ public class Syntactic {
 
     public static void Stmt() throws IOException {
         int temp_line;
-        String returnValue = null;
+        String returnValue;
         if (current_word.lexical_content.equals("if")) {
             if_stack ++;
-            int ifLabel = 0, elseLabel = 0, ifBr = 0, elseBr = 0, elseFlag = 0;
+            int ifLabel, elseLabel, ifBr, elseBr = 0, elseFlag = 0;
             Compiler.print_word(current_word);
             if (!current_word.lexical_content.equals("("))
                 ERROR();
@@ -764,7 +760,7 @@ public class Syntactic {
                 Compiler.print_word(current_word);
         } else if (current_word.lexical_content.equals("return")) {
             int return_line = current_word.lexical_line;
-            String expResult = null;
+            String expResult;
             Compiler.print_word(current_word);
             if (!current_word.lexical_content.equals(";")) {
                 expResult = Exp();
@@ -788,7 +784,7 @@ public class Syntactic {
             }
         } else if (current_word.lexical_content.equals("printf")) {
             int temp_exp_num = 0, format_string_line, printf_line, format_string_num;
-            String printf_word = null;
+            String printf_word;
             printf_param = new ArrayList<>();
             printf_line = current_word.lexical_line;
             Compiler.print_word(current_word);
@@ -1212,30 +1208,74 @@ public class Syntactic {
     }
 
     public static Symbol LVal() throws IOException {
-        Symbol temp_word;
-        int temp_dimension = 0;
+        Symbol temp_word, finalWord = null;
+        int temp_dimension = 0, arrayFlag = 0;
+        String tempValue = null;
+        Register tempRegister = null, valueRegister = null, baseRegister = null;
         if ((temp_word = Compiler.search_symbol_table(current_word)) == null) {
             Compiler.error_analysis('c', current_word.lexical_line);
             temp_dimension = -2;
         }
-        else
+        else {
+            finalWord = new Symbol(temp_word);
             temp_dimension = temp_word.dimension;
+            baseRegister = temp_word.register;
+        }
         Ident();
         while (current_word.lexical_content.equals("[")) {
-            if (temp_word != null)
+            if (temp_word != null) {
                 temp_dimension --;
+                finalWord.dimension --;
+                finalWord.dimensionValue.remove(0);
+            }
             Compiler.print_word(current_word);
-            Exp();
+            tempValue = Exp();
+            if (tempValue.contains("%")) {
+                valueRegister = Compiler.currentRegisterTable.map.get(tempValue);
+            } else {
+                valueRegister = new Register();
+                valueRegister.value.add(Integer.parseInt(tempValue));
+            }
+            tempRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
+            if (temp_dimension == 2) {
+                int k = temp_word.dimensionValue.get(1);
+                int bound = valueRegister.value.get(0);
+                for (int j = 0;j < k;j ++) {
+                    tempRegister.value.add(finalWord.register.value.get(bound * k + j));
+                }
+            } else if (temp_dimension == 1) {
+                tempRegister.value.add(finalWord.register.value.get(valueRegister.value.get(valueRegister.value.size() - 1)));
+            }
+            Compiler.llvmPrint("%"+tempRegister.registerNumber+" = getelementptr ", stage, true);
+            for (int i = 0;i < temp_dimension;i ++) {
+                Compiler.llvmPrint("["+temp_word.dimensionValue.get(i)+" x ", 1, true);
+            }
+            Compiler.llvmPrint("i32", 1, true);
+            for (int i = 0;i < temp_dimension;i ++) {
+                Compiler.llvmPrint("]", 1, true);
+            }
+            Compiler.llvmPrint(" ", 1, true);
+            for (int i = 0;i < temp_dimension;i ++) {
+                Compiler.llvmPrint("["+temp_word.dimensionValue.get(i)+" x ", 1, true);
+            }
+            Compiler.llvmPrint("i32", 1, true);
+            for (int i = 0;i < temp_dimension;i ++) {
+                Compiler.llvmPrint("]", 1, true);
+            }
+            assert baseRegister != null;
+            Compiler.llvmPrint("* %"+baseRegister.registerNumber+", i32 0, i32 "+valueRegister.value.get(0)+"\n", 1, true);
             if (!current_word.lexical_content.equals("]")) {
                 int temp_line = get_previous_line();
                 Compiler.error_analysis('k', temp_line);
             }
             else
                 Compiler.print_word(current_word);
+            baseRegister = tempRegister;
+            finalWord.register = tempRegister;
         }
         current_param_dimension = temp_dimension;
         Compiler.print_syntactic("<LVal>");
-        return temp_word;
+        return finalWord;
     }
 
     public static String PrimaryExp() throws IOException {
@@ -1256,9 +1296,9 @@ public class Syntactic {
                 }
                 break;
             case "IDENFR":
-                returnRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
                 lvalSymbol = LVal();
                 tempRegister = lvalSymbol.register;
+                returnRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
                 Compiler.llvmPrint("%"+returnRegister.registerNumber+
                         " = load i32, i32* ", stage, on);
                 if (!tempRegister.isGlobal)

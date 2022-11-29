@@ -17,4 +17,15 @@ public class Symbol {
         this.type = type;
         this.var_type = var_type;
     }
+
+    public Symbol(Symbol temp_word) {
+        this.word = temp_word.word;
+        this.type = temp_word.type;
+        this.var_type = temp_word.var_type;
+        this.register = temp_word.register;
+        this.dimensionValue = new ArrayList<>(temp_word.dimensionValue);
+        this.dimension = temp_word.dimension;
+        this.fun_param = new ArrayList<>(temp_word.fun_param);
+        this.fun_dimension = new ArrayList<>(temp_word.fun_dimension);
+    }
 }
