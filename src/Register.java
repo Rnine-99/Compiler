@@ -5,6 +5,7 @@ public class Register {
     public String label;
     public ArrayList<Integer> value = new ArrayList<>();
     public boolean isGlobal;
+    public boolean isParam;
 
     public Register(int size) {
         this.registerNumber = size;
@@ -13,9 +14,10 @@ public class Register {
     public Register(int registerNumber, String label) {
         this.registerNumber = registerNumber;
         this.label = label;
+        this.isParam = false;
     }
 
     public Register() {
-
+        this.isParam = false;
     }
 }

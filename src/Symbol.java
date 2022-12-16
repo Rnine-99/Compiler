@@ -11,11 +11,13 @@ public class Symbol {
     public ArrayList<Integer> dimensionValue = new ArrayList<>();
     public ArrayList<Integer> fun_dimension = new ArrayList<>();
     public Register register;
+    public Boolean ifArrayUsed;
 
     public Symbol(Lexical word, String type, String var_type) {
         this.word = word;
         this.type = type;
         this.var_type = var_type;
+        this.ifArrayUsed = false;
     }
 
     public Symbol(Symbol temp_word) {
@@ -27,5 +29,6 @@ public class Symbol {
         this.dimension = temp_word.dimension;
         this.fun_param = new ArrayList<>(temp_word.fun_param);
         this.fun_dimension = new ArrayList<>(temp_word.fun_dimension);
+        this.ifArrayUsed = false;
     }
 }
