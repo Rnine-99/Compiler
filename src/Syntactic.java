@@ -19,7 +19,7 @@ public class Syntactic {
     public static ArrayList<ArrayList<String>> func_stack = new ArrayList<>();
     public static int func_param_define;
     public static int if_stack = 0;
-    public static ArrayList<Integer> constValue = null;
+    public static ArrayList<String> constValue = null;
     public static void CompUnit() throws IOException {
         Compiler.llvmPrint("declare i32 @getint()\n"+
                 "declare void @putint(i32)\n"+
@@ -84,7 +84,6 @@ public class Syntactic {
             FuncFParams();
         for (int j = 0;j < current_func.fun_param.size();j ++) {
             Symbol i = current_func.fun_param.get(j);
-            i.register.isParam = true;
             if (j != 0)
                 Compiler.llvmPrint(" ,", 1, true);
             switch (i.dimension) {
@@ -132,6 +131,7 @@ public class Syntactic {
             Compiler.llvmPrint("store i32 %"+
                     current_func.fun_param.get(i).register.registerNumber+
                     ", i32* %"+paramRegister.registerNumber+"\n", stage, true);
+            paramRegister.isParam = true;
             current_func.fun_param.get(i).register = paramRegister;
         }
         Block();
@@ -378,17 +378,33 @@ public class Syntactic {
                     }
                 } else if (temp_dimension == 2){
                     Compiler.llvmPrint("[", stage, true);
+                    ArrayList<Integer> transferConstValue = new ArrayList<>();
+                    for (String i : constValue) {
+                        if (i.contains("%")) {
+                            transferConstValue.add(Compiler.currentRegisterTable.map.get(i).value.get(0));
+                        } else {
+                            transferConstValue.add(Integer.parseInt(i));
+                        }
+                    }
                     for (int i = 0;i < constValue.size();i ++) {
                         if (i != 0) {
                             Compiler.llvmPrint(", ", stage, true);
                         }
-                        Compiler.llvmPrint("i32 "+constValue.get(i), stage, true);
+                        Compiler.llvmPrint("i32 "+transferConstValue.get(i), stage, true);
                     }
                     Compiler.llvmPrint("]\n", stage, true);
-                    const_var.register.value = constValue;
+                    const_var.register.value = transferConstValue;
                 } else {
                     Compiler.llvmPrint("[", stage, true);
                     int b = const_var.dimensionValue.get(1);
+                    ArrayList<Integer> transferConstValue = new ArrayList<>();
+                    for (String i : constValue) {
+                        if (i.contains("%")) {
+                            transferConstValue.add(Compiler.currentRegisterTable.map.get(i).value.get(0));
+                        } else {
+                            transferConstValue.add(Integer.parseInt(i));
+                        }
+                    }
                     for (int i = 0;i < const_var.dimensionValue.get(0);i ++) {
                         if (i != 0) {
                             Compiler.llvmPrint(", ", stage, true);
@@ -398,12 +414,12 @@ public class Syntactic {
                             if (j != 0) {
                                 Compiler.llvmPrint(", ", stage, true);
                             }
-                            Compiler.llvmPrint("i32 "+constValue.get(i * b + j), stage, true);
+                            Compiler.llvmPrint("i32 "+transferConstValue.get(i * b + j), stage, true);
                         }
                         Compiler.llvmPrint("]", stage, true);
                     }
                     Compiler.llvmPrint("]\n", stage, true);
-                    const_var.register.value = constValue;
+                    const_var.register.value = transferConstValue;
                 }
             } else {
                 if (temp_dimension == 1) {
@@ -430,7 +446,6 @@ public class Syntactic {
                                 +", i32 "+i+"\n", stage, true);
                         Compiler.llvmPrint("store i32 "+constValue.get(i)+", i32* %"+arrayTemp.registerNumber+"\n", stage, true);
                     }
-                    const_var.register.value = constValue;
                 }
             }
         }
@@ -523,19 +538,35 @@ public class Syntactic {
                     assert var != null;
                     var.register.value = returnRegister.value;
                 }
-            } else if (temp_dimension == 2){
+            } else if (temp_dimension == 2) {
                 Compiler.llvmPrint("[", stage, true);
+                ArrayList<Integer> transferConstValue = new ArrayList<>();
+                for (String i : constValue) {
+                    if (i.contains("%")) {
+                        transferConstValue.add(Compiler.currentRegisterTable.map.get(i).value.get(0));
+                    } else {
+                        transferConstValue.add(Integer.parseInt(i));
+                    }
+                }
                 for (int i = 0;i < constValue.size();i ++) {
                     if (i != 0) {
                         Compiler.llvmPrint(", ", stage, true);
                     }
-                    Compiler.llvmPrint("i32 "+constValue.get(i), stage, true);
+                    Compiler.llvmPrint("i32 "+transferConstValue.get(i), stage, true);
                 }
                 Compiler.llvmPrint("]\n", stage, true);
-                var.register.value = constValue;
+                var.register.value = transferConstValue;
             } else {
                 Compiler.llvmPrint("[", stage, true);
                 int b = var.dimensionValue.get(1);
+                ArrayList<Integer> transferConstValue = new ArrayList<>();
+                for (String i : constValue) {
+                    if (i.contains("%")) {
+                        transferConstValue.add(Compiler.currentRegisterTable.map.get(i).value.get(0));
+                    } else {
+                        transferConstValue.add(Integer.parseInt(i));
+                    }
+                }
                 for (int i = 0;i < var.dimensionValue.get(0);i ++) {
                     if (i != 0) {
                         Compiler.llvmPrint(", ", stage, true);
@@ -545,12 +576,12 @@ public class Syntactic {
                         if (j != 0) {
                             Compiler.llvmPrint(", ", stage, true);
                         }
-                        Compiler.llvmPrint("i32 "+constValue.get(i * b + j), stage, true);
+                        Compiler.llvmPrint("i32 "+transferConstValue.get(i * b + j), stage, true);
                     }
                     Compiler.llvmPrint("]", stage, true);
                 }
                 Compiler.llvmPrint("]\n", stage, true);
-                var.register.value = constValue;
+                var.register.value = transferConstValue;
             }
         } else {
             if (temp_dimension == 1) {
@@ -561,6 +592,7 @@ public class Syntactic {
                 } else {
                     Register tempRegister = Compiler.currentRegisterTable.map.get(temp);
                     var.register.value = tempRegister.value;
+                    var.register.isParam = tempRegister.isParam;
                 }
             } else {
                 Register arrayStart = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
@@ -577,7 +609,6 @@ public class Syntactic {
                     +", i32 "+i+"\n", stage, true);
                     Compiler.llvmPrint("store i32 "+constValue.get(i)+", i32* %"+arrayTemp.registerNumber+"\n", stage, true);
                 }
-                var.register.value = constValue;
             }
         }
         Compiler.print_syntactic("<VarDef>");
@@ -629,6 +660,7 @@ public class Syntactic {
         if (param != null) {
             param.dimension = temp_dimension;
             param.register = Compiler.newRegister(param);
+            param.register.isParam = true;
         }
         current_func.fun_param.add(param);
         Compiler.print_syntactic("<FuncFParam>");
@@ -656,17 +688,17 @@ public class Syntactic {
             if (!current_word.lexical_content.equals("}")) {
                 returnValue = ConstInitVal();
                 if (returnValue.contains("%")) {
-                    constValue.add(Compiler.currentRegisterTable.map.get(returnValue).value.get(0));
+                    constValue.add(returnValue);
                 } else if (!returnValue.equals("array")) {
-                    constValue.add(Integer.parseInt(returnValue));
+                    constValue.add(returnValue);
                 }
                 while (current_word.lexical_content.equals(",")) {
                     Compiler.print_word(current_word);
                     returnValue = ConstInitVal();
                     if (returnValue.contains("%")) {
-                        constValue.add(Compiler.currentRegisterTable.map.get(returnValue).value.get(0));
+                        constValue.add(returnValue);
                     } else if (!returnValue.equals("array")) {
-                        constValue.add(Integer.parseInt(returnValue));
+                        constValue.add(returnValue);
                     }
                 }
                 if (!current_word.lexical_content.equals("}"))
@@ -943,9 +975,9 @@ public class Syntactic {
         } else {
             returnValue = Exp();
             if (returnValue.contains("%")) {
-                constValue.add(Compiler.currentRegisterTable.map.get(returnValue).value.get(0));
+                constValue.add(returnValue);
             } else {
-                constValue.add(Integer.parseInt(returnValue));
+                constValue.add(returnValue);
             }
         }
         Compiler.print_syntactic("<InitVal>");
@@ -982,14 +1014,16 @@ public class Syntactic {
             if (!returnValue.contains("%"))
                 left = Integer.parseInt(returnValue);
             else if (Compiler.currentRegisterTable.map.get(returnValue).isParam) {
-                left = Compiler.currentRegisterTable.map.get(returnValue).value.get(0);
                 leftParam = true;
+            } else {
+                left = Compiler.currentRegisterTable.map.get(returnValue).value.get(0);
             }
             if (!temp.contains("%"))
                 right = Integer.parseInt(temp);
             else if (Compiler.currentRegisterTable.map.get(temp).isParam) {
-                right = Compiler.currentRegisterTable.map.get(temp).value.get(0);
                 rightParam = true;
+            } else {
+                right = Compiler.currentRegisterTable.map.get(temp).value.get(0);
             }
             boolean ifJoinParam = leftParam | rightParam;
             switch (operator) {
@@ -1058,14 +1092,16 @@ public class Syntactic {
             if (!returnValue.contains("%"))
                 left = Integer.parseInt(returnValue);
             else if (Compiler.currentRegisterTable.map.get(returnValue).isParam) {
-                left = Compiler.currentRegisterTable.map.get(returnValue).value.get(0);
                 leftParam = true;
+            } else {
+                left = Compiler.currentRegisterTable.map.get(returnValue).value.get(0);
             }
             if (!temp.contains("%"))
                 right = Integer.parseInt(temp);
             else if (Compiler.currentRegisterTable.map.get(temp).isParam) {
-                right = Compiler.currentRegisterTable.map.get(temp).value.get(0);
                 rightParam = true;
+            } else {
+                right = Compiler.currentRegisterTable.map.get(temp).value.get(0);
             }
             boolean ifJoinParam = leftParam | rightParam;
             switch (operator) {
@@ -1266,8 +1302,8 @@ public class Syntactic {
 
     public static Symbol LVal() throws IOException {
         Symbol temp_word, finalWord = null;
-        int temp_dimension = 0, arrayFlag = 0;
-        String tempValue = null;
+        int temp_dimension;
+        String tempValue;
         Register tempRegister = null, valueRegister = null, baseRegister = null;
         if ((temp_word = Compiler.search_symbol_table(current_word)) == null) {
             Compiler.error_analysis('c', current_word.lexical_line);
@@ -1296,7 +1332,9 @@ public class Syntactic {
                 valueRegister.value.add(Integer.parseInt(tempValue));
             }
             tempRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
-            if (!finalWord.register.isParam) {
+            if (finalWord.register.isParam) {
+                tempRegister.isParam = true;
+            } else {
                 if (temp_dimension == 2) {
                     int k = temp_word.dimensionValue.get(1);
                     int bound = valueRegister.value.get(0);
@@ -1374,6 +1412,9 @@ public class Syntactic {
                 // 应当对LVal返回为数组或其他类型进行判断是否需要load语句
                 if (lValSymbol.dimension == 1) {
                     returnRegister = Compiler.newTempRegister("%" + Compiler.currentRegisterTable.map.size());
+                    if (lValSymbol.register.isParam) {
+                        returnRegister.isParam = true;
+                    }
                     Compiler.llvmPrint("%" + returnRegister.registerNumber +
                             " = load i32, i32* ", stage, on);
                     if (!tempRegister.isGlobal)
@@ -1384,6 +1425,9 @@ public class Syntactic {
                     returnValue = "%" + returnRegister.registerNumber;
                 } else {
                         returnRegister = Compiler.newTempRegister("%" + Compiler.currentRegisterTable.map.size());
+                        if (lValSymbol.register.isParam) {
+                            returnRegister.isParam = true;
+                        }
                         Compiler.llvmPrint("%"+returnRegister.registerNumber+" = getelementptr ", stage, true);
                         for (int i = 0;i < lValSymbol.dimension - 1;i ++) {
                             Compiler.llvmPrint("["+lValSymbol.dimensionValue.get(i)+" x ", 1, true);
@@ -1488,31 +1532,14 @@ public class Syntactic {
             Compiler.print_word(current_word);
             String tempValue = RelExp();
             Register newRegister = null;
-            int left = 0, right = 0;
-            if (!returnValue.contains("%"))
-                left = Integer.parseInt(returnValue);
-            else
-                left = Compiler.currentRegisterTable.map.get(returnValue).value.get(0);
-            if (!tempValue.contains("%"))
-                right = Integer.parseInt(tempValue);
-            else
-                right = Compiler.currentRegisterTable.map.get(tempValue).value.get(0);
             switch (operator) {
                 case 1:
                     newRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
                     Compiler.llvmPrint("%"+newRegister.registerNumber+" = icmp eq i32 "+returnValue+", "+tempValue+"\n", stage, on);
-                    if (left == right)
-                        newRegister.value.add(1);
-                    else
-                        newRegister.value.add(0);
                     break;
                 case 2:
                     newRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
                     Compiler.llvmPrint("%"+newRegister.registerNumber+" = icmp ne i32 "+returnValue+", "+tempValue+"\n", stage, on);
-                    if (left != right)
-                        newRegister.value.add(1);
-                    else
-                        newRegister.value.add(0);
                     break;
             }
             returnValue = "%"+newRegister.registerNumber;
@@ -1549,47 +1576,22 @@ public class Syntactic {
             Compiler.print_word(current_word);
             String tempValue = AddExp();
             Register newRegister = null;
-            int left = 0, right = 0;
-            if (!returnValue.contains("%"))
-                left = Integer.parseInt(returnValue);
-            else
-                left = Compiler.currentRegisterTable.map.get(returnValue).value.get(0);
-            if (!tempValue.contains("%"))
-                right = Integer.parseInt(tempValue);
-            else
-                right = Compiler.currentRegisterTable.map.get(tempValue).value.get(0);
             switch (operator) {
                 case 1:
                     newRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
                     Compiler.llvmPrint("%"+newRegister.registerNumber+" = icmp slt i32 "+returnValue+", "+tempValue+"\n", stage, on);
-                    if (left < right)
-                        newRegister.value.add(1);
-                    else
-                        newRegister.value.add(0);
                     break;
                 case 2:
                     newRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
                     Compiler.llvmPrint("%"+newRegister.registerNumber+" = icmp sgt i32 "+returnValue+", "+tempValue+"\n", stage, on);
-                    if (left > right)
-                        newRegister.value.add(1);
-                    else
-                        newRegister.value.add(0);
                     break;
                 case 3:
                     newRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
                     Compiler.llvmPrint("%"+newRegister.registerNumber+" = icmp sle i32 "+returnValue+", "+tempValue+"\n", stage, on);
-                    if (left <= right)
-                        newRegister.value.add(1);
-                    else
-                        newRegister.value.add(0);
                     break;
                 case 4:
                     newRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
                     Compiler.llvmPrint("%"+newRegister.registerNumber+" = icmp sge i32 "+returnValue+", "+tempValue+"\n", stage, on);
-                    if (left >= right)
-                        newRegister.value.add(1);
-                    else
-                        newRegister.value.add(0);
                     break;
             }
             returnValue = "%"+newRegister.registerNumber;

@@ -72,12 +72,10 @@ int func_params(int a, int b[], int c[][2])
 {
     /// Stmt → LVal '=' Exp ';'
     int d = a*2 + b[0] % 2 + c[0][0] % 3;
-    /*
     /// [Exp] ';' //有无Exp两种情况 1.有Exp
     a_glogal = d * (a + 2);
     /// [Exp] ';' //有无Exp两种情况 2.无Exp    当然，这里如果 if()后面直接跟; 也是能实现的
     ;
-
     if (a_glogal < 50) {
         printf("Now a_global is %d, it is < 50.\n", a_glogal);
     } else if (a_glogal == 50) {
@@ -85,10 +83,8 @@ int func_params(int a, int b[], int c[][2])
     } else {
         printf("Now a_global is %d, it is > 50.\n", a_glogal);
     }
-    */
     return 0;
 }
-/*
 int func2_params(int a, int b, int c)
 {
     int res = 6 * (a + b + c)  / 2 - 2;
@@ -120,12 +116,11 @@ int func_no_params()
 void func2_no_params()
 {
 }
-*/
 
 /**
  * 主函数定义 MainFuncDef → 'int' 'main' '(' ')' Block // 存在main函数
  */
-/*
+
 int main()
 {
     int main_var_a, main_var_b, main_var_c;
@@ -175,6 +170,7 @@ int main()
         }
     }
 
+    /*
     if (main_var_a >= 30) {
         printf("Now main_var_a is %d, it is >= 30\n", main_var_a);
     } else if (main_var_a <= 10) {
@@ -188,9 +184,11 @@ int main()
 
     printf("==================testfile1 end==================");
 
+    */
     return 0;
 }
-*/
+/*
 int main() {
     return 0;
 }
+*/
