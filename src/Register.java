@@ -6,6 +6,7 @@ public class Register {
     public ArrayList<Integer> value = new ArrayList<>();
     public boolean isGlobal;
     public boolean isParam;
+    public boolean isDirectParam;
 
     public Register(int size) {
         this.registerNumber = size;
@@ -15,6 +16,7 @@ public class Register {
         this.registerNumber = registerNumber;
         this.label = label;
         this.isParam = false;
+        this.isDirectParam = false;
     }
 
     public Register() {
