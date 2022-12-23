@@ -135,8 +135,10 @@ public class Syntactic {
             current_func.fun_param.get(i).register = paramRegister;
         }
         Block();
-        if (fun_if_return == 0 && fun_type_flag == 0)
+        if (fun_if_return == 0 && fun_type_flag == 0) {
+            Compiler.newLabelRegister();
             Compiler.llvmPrint("ret void\n", stage, true);
+        }
         Compiler.llvmPrint("}\n", 1, true);
         Compiler.previous_word();
         if (fun_type_flag == 1 && (last_sentence == null || !last_sentence.lexical_content.equals("return")))
@@ -509,7 +511,7 @@ public class Syntactic {
                     Compiler.llvmPrint("\n", 1, true);
                 }
             }
-            var.register = Compiler.newRegister(var);
+            var.register = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
         }
         if (!current_word.lexical_content.equals("=")) {
             if (stage == 1) {
@@ -785,7 +787,11 @@ public class Syntactic {
                 ERROR();
             else
                 Compiler.print_word(current_word);
-            Cond();
+            Register whileLabel = Compiler.newLabelRegister();
+            Compiler.llvmPrint("br label %"+whileLabel.registerNumber+"\n", stage, true);
+            Compiler.llvmPrint("\n; <label>:"+whileLabel.registerNumber+":\n", stage, true);
+            returnValue = Cond();
+            Compiler.llvmPrint("br i1 "+returnValue+", label <while"+while_block_flag+">, label <else"+while_block_flag+">\n", stage, true);
             if (!current_word.lexical_content.equals(")")) {
                 temp_line = get_previous_line();
                 Compiler.error_analysis('j', temp_line);
@@ -793,8 +799,24 @@ public class Syntactic {
             else
                 Compiler.print_word(current_word);
             while_block_flag ++;
+            Register while_main_register = Compiler.newLabelRegister();
+            Compiler.llvmPrint("\n; <label>:"+while_main_register.registerNumber+":\n", stage, true);
             Stmt();
+            Compiler.llvmPrint("br label %"+whileLabel.registerNumber+"\n", stage, true);
             while_block_flag --;
+            Register main_register = Compiler.newLabelRegister();
+            Compiler.llvmPrint("\n; <label>:"+main_register.registerNumber+":\n", stage, true);
+
+            for (int i = 0;i < Compiler.bufferFlag;i ++) {
+                if (Compiler.buffer.get(i).contains("<while"+while_block_flag+">"))
+                    Compiler.buffer.set(i,
+                            Compiler.buffer.get(i).replace("<while"+while_block_flag+">", "%"+while_main_register.registerNumber));
+            }
+            for (int i = 0;i < Compiler.bufferFlag;i ++) {
+                if (Compiler.buffer.get(i).contains("<else"+while_block_flag+">"))
+                    Compiler.buffer.set(i,
+                            Compiler.buffer.get(i).replace("<else"+while_block_flag+">", "%"+main_register.registerNumber));
+            }
         } else if (current_word.lexical_content.equals("break") || current_word.lexical_content.equals("continue")) {
             if (while_block_flag == 0)
                 Compiler.error_analysis('m', current_word.lexical_line);
@@ -810,6 +832,7 @@ public class Syntactic {
             Compiler.print_word(current_word);
             if (!current_word.lexical_content.equals(";")) {
                 expResult = Exp();
+                Compiler.newLabelRegister();
                 Compiler.llvmPrint("ret i32 "+expResult+"\n", stage, true);
                 if (fun_type_flag == 0)
                     if (current_word.lexical_content.equals(";"))
@@ -820,6 +843,7 @@ public class Syntactic {
                         return;
                     }
             } else if (fun_type_flag == 0) {
+                Compiler.newLabelRegister();
                 Compiler.llvmPrint("ret void\n", stage, true);
             }
             fun_if_return = 1;
@@ -897,8 +921,12 @@ public class Syntactic {
                             Register newRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
                             Compiler.llvmPrint("%"+newRegister.registerNumber+
                                     " = call i32 @getint()\n", stage, true);
-                            Compiler.llvmPrint("store i32 %"+newRegister.registerNumber+
+                            if (!temp_type.register.isGlobal)
+                                Compiler.llvmPrint("store i32 %"+newRegister.registerNumber+
                                     ", i32* %"+temp_type.register.registerNumber+"\n", stage, true);
+                            else
+                                Compiler.llvmPrint("store i32 %"+newRegister.registerNumber+
+                                        ", i32* @"+temp_type.word.lexical_content+"\n", stage, true);
                         }
                         Compiler.print_word(current_word);
                         if (!current_word.lexical_content.equals("("))
@@ -914,8 +942,14 @@ public class Syntactic {
                     } else {
                         returnValue = Exp();
                         if (temp_type != null)
-                            Compiler.llvmPrint("store i32 "+returnValue+
-                                ", i32* %"+temp_type.register.registerNumber+"\n", stage, true);
+                            if (temp_type.register.isGlobal && !temp_type.ifArrayUsed) {
+                                Compiler.llvmPrint("store i32 "+returnValue+
+                                        ", i32* @"+temp_type.word.lexical_content+"\n", stage, true);
+                            }
+                            else {
+                                Compiler.llvmPrint("store i32 "+returnValue+
+                                        ", i32* %"+temp_type.register.registerNumber+"\n", stage, true);
+                            }
                     }
                 }
                 temp_line = get_previous_line();
@@ -1148,7 +1182,7 @@ public class Syntactic {
                 tempRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
                 Compiler.llvmPrint("%"+tempRegister.registerNumber+" = icmp ne i32 "+tempValue+", 0\n", stage, on);
             }
-            Compiler.llvmPrint("br i1 "+tempValue+" label <if"+if_stack+">, label <next lor>\n", stage, on);
+            Compiler.llvmPrint("br i1 "+tempValue+", label <if"+if_stack+">, label <next lor>\n", stage, on);
             Compiler.print_syntactic("<LOrExp>");
             Compiler.print_word(current_word);
             tempLabel = Compiler.newLabelRegister();
@@ -1320,7 +1354,6 @@ public class Syntactic {
         Ident();
         while (current_word.lexical_content.equals("[")) {
             assert finalWord != null;
-            finalWord.ifArrayUsed = true;
             if (temp_word != null) {
                 temp_dimension --;
                 finalWord.dimension --;
@@ -1378,10 +1411,17 @@ public class Syntactic {
                 else
                     Compiler.llvmPrint("* %"+baseRegister.registerNumber+", i32 "+valueRegister.value.get(0)+"\n", 1, true);
             else
-                if (valueRegister.value.size() == 0)
-                    Compiler.llvmPrint("* %"+baseRegister.registerNumber+", i32 0, i32 %"+valueRegister.registerNumber+"\n", 1, true);
-                else
-                    Compiler.llvmPrint("* %"+baseRegister.registerNumber+", i32 0, i32 "+valueRegister.value.get(0)+"\n", 1, true);
+                if (finalWord.register.isGlobal && !finalWord.ifArrayUsed) {
+                    if (valueRegister.value.size() == 0 || tempValue.contains("%"))
+                        Compiler.llvmPrint("* @"+finalWord.word.lexical_content+", i32 0, i32 %"+valueRegister.registerNumber+"\n", 1, true);
+                    else
+                        Compiler.llvmPrint("* @"+finalWord.word.lexical_content+", i32 0, i32 "+valueRegister.value.get(0)+"\n", 1, true);
+                } else {
+                    if (valueRegister.value.size() == 0 || tempValue.contains("%"))
+                        Compiler.llvmPrint("* %"+baseRegister.registerNumber+", i32 0, i32 %"+valueRegister.registerNumber+"\n", 1, true);
+                    else
+                        Compiler.llvmPrint("* %"+baseRegister.registerNumber+", i32 0, i32 "+valueRegister.value.get(0)+"\n", 1, true);
+                }
             if (!current_word.lexical_content.equals("]")) {
                 int temp_line = get_previous_line();
                 Compiler.error_analysis('k', temp_line);
@@ -1390,8 +1430,9 @@ public class Syntactic {
                 Compiler.print_word(current_word);
             baseRegister = tempRegister;
             finalWord.register = tempRegister;
-            if (finalWord.register.isParam && temp_dimension != 1)
+            if (!finalWord.register.isParam && temp_dimension != 1)
                 finalWord.dimensionValue.remove(0);
+            finalWord.ifArrayUsed = true;
         }
         current_param_dimension = temp_dimension;
         Compiler.print_syntactic("<LVal>");
@@ -1455,7 +1496,10 @@ public class Syntactic {
                         for (int i = 0; i < lValSymbol.dimension - 1; i++) {
                             Compiler.llvmPrint("]", 1, true);
                         }
-                        Compiler.llvmPrint("* %" + tempRegister.registerNumber + ", i32 0, i32 0" + "\n", 1, true);
+                        if (tempRegister.isGlobal && !lValSymbol.ifArrayUsed)
+                            Compiler.llvmPrint("* @" + lValSymbol.word.lexical_content + ", i32 0, i32 0" + "\n", 1, true);
+                        else
+                            Compiler.llvmPrint("* %" + tempRegister.registerNumber + ", i32 0, i32 0" + "\n", 1, true);
                         returnValue = "%" + returnRegister.registerNumber;
                     }
                 }
@@ -1492,7 +1536,7 @@ public class Syntactic {
                 tempRegister = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
                 Compiler.llvmPrint("%"+tempRegister.registerNumber+" = icmp ne i32 "+tempValue+", 0\n", stage, true);
             }
-            Compiler.llvmPrint("br i1 "+tempValue+" label <next add>, label <else"+if_stack+">\n", stage, true);
+            Compiler.llvmPrint("br i1 "+tempValue+", label <next add>, label <else"+if_stack+">\n", stage, true);
             Compiler.print_syntactic("<LAndExp>");
             Compiler.print_word(current_word);
             tempLabel = Compiler.newLabelRegister();
@@ -1645,7 +1689,7 @@ public class Syntactic {
         for (int i = 1;i < temp.length() - 1;i ++) {
             if (temp.charAt(i) == '%') {
                 if (temp.charAt(i + 1) == 'd') {
-                    callPutChar(printf_param.get(temp_num));
+                    callPutChar(printf_param.get(temp_num ++));
                     i ++;
                     continue;
                 }
