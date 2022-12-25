@@ -1,5 +1,8 @@
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 
 public class Syntactic {
     public static Lexical current_word;
@@ -466,6 +469,13 @@ public class Syntactic {
                                 +", i32 "+i+"\n", stage, true);
                         Compiler.llvmPrint("store i32 "+constValue.get(i)+", i32* %"+arrayTemp.registerNumber+"\n", stage, true);
                     }
+                    for (String s : constValue) {
+                        if (s.contains("%")) {
+                            const_var.register.value.add(Compiler.currentRegisterTable.map.get(s).value.get(0));
+                        } else {
+                            const_var.register.value.add(Integer.parseInt(s));
+                        }
+                    }
                 } else {
                     Register arrayStart = Compiler.newTempRegister("%"+Compiler.currentRegisterTable.map.size());
                     Compiler.llvmPrint("%"+arrayStart.registerNumber+" = getelementptr ["+
@@ -482,6 +492,13 @@ public class Syntactic {
                         Compiler.llvmPrint("%"+arrayTemp.registerNumber+" = getelementptr i32, i32* %"+arrayStart.registerNumber
                                 +", i32 "+i+"\n", stage, true);
                         Compiler.llvmPrint("store i32 "+constValue.get(i)+", i32* %"+arrayTemp.registerNumber+"\n", stage, true);
+                    }
+                    for (String s : constValue) {
+                        if (s.contains("%")) {
+                            const_var.register.value.add(Compiler.currentRegisterTable.map.get(s).value.get(0));
+                        } else {
+                            const_var.register.value.add(Integer.parseInt(s));
+                        }
                     }
                 }
             }
@@ -722,10 +739,7 @@ public class Syntactic {
                     Compiler.print_word(current_word);
             }
         }
-        for (String i : Compiler.currentRegisterTable.map.keySet()) {
-            if (i.contains("%"))
-                Compiler.currentRegisterTable.map.remove(i);
-        }
+        Compiler.currentRegisterTable.map.entrySet().removeIf(entry -> entry.getKey().contains("%"));
         if (param != null) {
             param.dimension = temp_dimension;
             param.register = Compiler.newRegister(param);
@@ -1514,7 +1528,7 @@ public class Syntactic {
                     tempRegister.value.add(finalWord.register.value.get(valueRegister.value.get(valueRegister.value.size() - 1)));
                 }
             }
-            if (stage != 1) {
+            if (stage != 1 && !isParamDefine) {
                 Compiler.llvmPrint("%" + tempRegister.registerNumber + " = getelementptr ", stage, true);
                 for (int i = 0; i < temp_dimension; i++) {
                     if (finalWord.register.isParam && i >= temp_dimension - 1)
